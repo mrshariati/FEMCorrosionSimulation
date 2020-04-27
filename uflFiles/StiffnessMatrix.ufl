@@ -1,0 +1,24 @@
+#Finite Element
+cell = triangle;
+H = FiniteElement("CG", cell, 1)
+
+ci = TrialFunction(H)
+v = TestFunction(H)
+
+Di = Constant(cell)
+zi = Constant(cell)
+phi = Coefficient(H)
+Ii = Coefficient(H)
+Ri = Coefficient(H)
+
+e = 1.60217662e-19
+k_B = 1.38064852e-23
+T = 275
+
+zrb = (1.60217662/(1.38064852*T))*1e4
+
+#Create stiffness matrix
+a = Di*dot(grad(ci),grad(v))*dx + Di*zi*zrb*ci*dot(grad(phi),grad(v))*dx
+L = Ri*v*dx - Ii*v*ds
+
+# ffc -l dolfin StiffnessMatrix.ufl
