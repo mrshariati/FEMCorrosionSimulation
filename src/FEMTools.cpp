@@ -372,7 +372,7 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 
 //DOI:10.1016/j.cma.2008.08.016
 //Flux-corrected-transport finite element method
-int FEMFCT_ML(Mat MC, Mat &ML) {
+int FEMFCT_ML_Compute(Mat MC, Mat &ML) {
 	//Input: MC
 	//Output: ML
 
