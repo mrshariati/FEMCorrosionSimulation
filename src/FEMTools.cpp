@@ -221,9 +221,9 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 		PetscInt ncolsD;
 
 		MatGetRow(MC, i, &ncolsMC, &colsMC, &mc_i);
-		MatGetRow(D, i, &ncolsD, &colsD, &d_i);
+		MatGetRow(Dk, i, &ncolsD, &colsD, &d_i);
 
-		std::vector<PetscInt> ri;
+		std::vector<PetscScalar> ri;
 		std::vector<PetscInt> ri_ind;
 		PetscInt j = 0;
 		PetscInt k = 0;
@@ -241,8 +241,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 				if (colsMC[j] != i) {
 					Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
 					Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
-					Qpi = std::max(Qpi, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i];);
-					Qni = std::min(Qni, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i];);
+					Qpi = std::max(Qpi, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
+					Qni = std::min(Qni, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
 				}
 				mi = mi + mc_i[j];
 				j = j + 1;
@@ -253,8 +253,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 				if (colsD[k] != i) {
 					Ppi = Ppi + std::max(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
 					Pni = Pni + std::min(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-					Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];);
-					Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];);
+					Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
+					Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
 				}
 				k = k + 1;
 			}
@@ -264,8 +264,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 				if (colsD[k] != i) {
 					Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
 					Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-					Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];);
-					Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];);
+					Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
+					Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
 				}
 				mi = mi + mc_i[j];
 				k = k + 1;
@@ -278,8 +278,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 			if (colsMC[j] != i) {
 				Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
 				Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
-				Qpi = std::max(Qpi, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i];);
-				Qni = std::min(Qni, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i];);
+				Qpi = std::max(Qpi, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
+				Qni = std::min(Qni, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
 			}
 			mi = mi + mc_i[j];
 			j = j + 1;
@@ -290,8 +290,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 			if (colsD[k] != i) {
 				Ppi = Ppi + std::max(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
 				Pni = Pni + std::min(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-				Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];);
-				Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];);
+				Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
+				Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
 			}
 			k = k + 1;
 		}
@@ -307,7 +307,7 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 		}
 
 		MatRestoreRow(MC, i, &ncolsMC, &colsMC, &mc_i);
-		MatRestoreRow(D, i, &ncolsD, &colsD, &d_i);
+		MatRestoreRow(Dk, i, &ncolsD, &colsD, &d_i);
 
 		ri_ind.clear();
 		ri.shrink_to_fit();
