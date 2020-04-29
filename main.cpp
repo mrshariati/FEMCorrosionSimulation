@@ -190,7 +190,7 @@ int main(int argc,char ** args) {
 	}
 
 	std::string PSolverMethod = "mumps";
-	std::string NPSolverMethod = "mumps";
+	std::string NPSolverMethod = "minres";
 
 	auto PSolver = std::make_shared<dolfin::PETScLUSolver>(PETSC_COMM_WORLD, PSolverMethod);
 	PSolver->set_operator(*A_P);
@@ -215,7 +215,7 @@ int main(int argc,char ** args) {
 	double t = 1e-2;
 	double dt = 1e-2;
 	std::size_t s = 100;
-	std::size_t totalsteps = 10*60*100 + 20*60*10 + 30*60*1; //10 minutes dt=1e-2 + 20 minutes dt=1e-1 + 30 minutes dt=1
+	std::size_t totalsteps = 10*60*100 + 50*60*10;// + 30*60*1; //10 minutes dt=1e-2 + 50 minutes dt=1e-1
 
 	auto cMg = std::make_shared<dolfin::PETScVector>(as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec());
 	auto cH = std::make_shared<dolfin::PETScVector>(as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec());
@@ -301,7 +301,7 @@ int main(int argc,char ** args) {
 	auto ff_Mg = std::make_shared<dolfin::File>("Results/Mg Concentration.pvd");
 	ff_Mg->operator<<(*Mgfuncs[0]);
 
-	auto NPSolver = std::make_shared<dolfin::LinearSolver>(PETSC_COMM_WORLD, NPSolverMethod);
+	auto NPSolver = std::make_shared<dolfin::PETScKrylovSolver>(PETSC_COMM_WORLD, NPSolverMethod, "petsc_amg");
 	NPSolver->set_operator(A_NPSolver);
 	NPSolver->solve(*Mgfuncs[1]->vector(), *b_NPSolver);
 
@@ -930,8 +930,8 @@ int main(int argc,char ** args) {
 		t = dt + t;
 		if (i == (10*60*100))
 			dt = 1e-1;
-		if (i == ((10*60*100)+(20*60*10)))
-			dt = 1;
+		//if (i == ((10*60*100)+(20*60*10)))
+		//	dt = 1;
 
 		*(Mgfuncs[0]->vector()) = *(Mgfuncs[1]->vector());
 		*(Hfuncs[0]->vector()) = *(Hfuncs[1]->vector());
