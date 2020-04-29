@@ -348,7 +348,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 			else
 				fi = fi + std::min(Rn_i[i], Rp_i[colsr[j]])*r_i[j];
 		}
-		VecSetValue(fStar, i, fi, INSERT_VALUES);
+		if (std::abs(fi)<1e23 && std::abs(fi)>1e-23)
+			VecSetValue(fStar, i, fi, INSERT_VALUES);
 		MatRestoreRow(r, i, &ncolsr, &colsr, &r_i);
 	}
 
