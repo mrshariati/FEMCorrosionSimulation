@@ -65,13 +65,29 @@ int BoundaryCurrent(std::vector<size_t> GlobalDOFSet_bar, double t, Vec cMg, Vec
 	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l
 	//Output: Ii
 
+	VecDuplicate(cMg, &Ii);
 	VecSet(Ii, 0);
 
-	//from gobal to local DOFs
-	PetscInt Ii_FromRow;
-	VecGetOwnershipRange(Ii, &Ii_FromRow, NULL);
-	for (size_t i = 0; i < GlobalDOFSet_bar.size(); i = i + 1)
-		GlobalDOFSet_bar[i] = GlobalDOFSet_bar[i]-Ii_FromRow;
+	VecScatter par2seq;
+	Vec cMg_SEQ, cOH_SEQ, cR_SEQ;
+
+	VecScatterCreateToAll(cMg, &par2seq, &cMg_SEQ);
+	VecScatterBegin(par2seq, cMg, cMg_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(par2seq, cMg, cMg_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecScatterDestroy(&par2seq);
+
+	VecScatterCreateToAll(cOH, &par2seq, &cOH_SEQ);
+	VecScatterBegin(par2seq, cOH, cOH_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(par2seq, cOH, cOH_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecScatterDestroy(&par2seq);
+
+	VecScatterCreateToAll(cReactionLimiter, &par2seq, &cR_SEQ);
+	VecScatterBegin(par2seq, cReactionLimiter, cR_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(par2seq, cReactionLimiter, cR_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecScatterDestroy(&par2seq);
 
 	PetscScalar eps;
 	PetscScalar teta;
@@ -79,21 +95,21 @@ int BoundaryCurrent(std::vector<size_t> GlobalDOFSet_bar, double t, Vec cMg, Vec
 
 	const PetscScalar* cMg_i;
 	const PetscScalar* cOH_i;
-	const PetscScalar* cR_i;
+	const PetscScalar* cReactionLimiter_i;
 
-	VecGetArrayRead(cMg, &cMg_i);
-	VecGetArrayRead(cOH, &cOH_i);
-	VecGetArrayRead(cReactionLimiter, &cR_i);
+	VecGetArrayRead(cMg_SEQ, &cMg_i);
+	VecGetArrayRead(cOH_SEQ, &cOH_i);
+	VecGetArrayRead(cR_SEQ, &cReactionLimiter_i);
 
 	//Computing the electerical current
-	for (size_t i = 0; i < GlobalDOFSet_bar.size(); i = i + 1) {
-		eps = epsODE(t, eps0, cMg_i[GlobalDOFSet_bar[i]], cOH_i[GlobalDOFSet_bar[i]]);
-		teta = tetaODE(t, teta0, l, eps, cMg_i[GlobalDOFSet_bar[i]], cOH_i[GlobalDOFSet_bar[i]]);
+	for (size_t j = 0; j < GlobalDOFSet_bar.size(); j = j + 1) {
+		eps = epsODE(t, eps0, cMg_i[GlobalDOFSet_bar[j]], cOH_i[GlobalDOFSet_bar[j]]);
+		teta = tetaODE(t, teta0, l, eps, cMg_i[GlobalDOFSet_bar[j]], cOH_i[GlobalDOFSet_bar[j]]);
 		iElectrode = iElectrodeFormula(teta, eps);
-		if(iElectrode<=cR_i[GlobalDOFSet_bar[i]])
-			VecSetValueLocal(Ii, GlobalDOFSet_bar[i], iElectrode, INSERT_VALUES);
+		if(iElectrode<=cReactionLimiter_i[GlobalDOFSet_bar[j]])
+			VecSetValue(Ii, GlobalDOFSet_bar[j], iElectrode, INSERT_VALUES);
 		else
-			VecSetValueLocal(Ii, GlobalDOFSet_bar[i], cR_i[GlobalDOFSet_bar[i]], INSERT_VALUES);
+			VecSetValue(Ii, GlobalDOFSet_bar[j], cReactionLimiter_i[GlobalDOFSet_bar[j]], INSERT_VALUES);
 	}
 
 	VecAssemblyBegin(Ii);
@@ -101,7 +117,13 @@ int BoundaryCurrent(std::vector<size_t> GlobalDOFSet_bar, double t, Vec cMg, Vec
 
 	VecRestoreArrayRead(cMg, &cMg_i);
 	VecRestoreArrayRead(cOH, &cOH_i);
-	VecRestoreArrayRead(cReactionLimiter, &cR_i);
+	VecRestoreArrayRead(cReactionLimiter, &cReactionLimiter_i);
+
+	PetscBarrier(NULL);
+
+	VecDestroy(&cMg_SEQ);
+	VecDestroy(&cOH_SEQ);
+	VecDestroy(&cR_SEQ);
 
 	return 0;
 }
