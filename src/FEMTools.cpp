@@ -12,7 +12,6 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &D, Mat &Lk) {
 	MatCreateTranspose(A, &ATr);
 
 	MatZeroEntries(D);
-	MatSetOption(D, MAT_NEW_NONZERO_LOCATIONS, PETSC_TRUE);
 
 	PetscInt A_FromRow;
 	PetscInt A_ToRow;
@@ -116,10 +115,9 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &D, Mat &Lk) {
 	VecDestroy(&vtmp);
 
 	MatZeroEntries(Lk);
-	MatSetOption(Lk, MAT_NEW_NONZERO_LOCATIONS, PETSC_TRUE);
 
-	MatCopy(A, Lk, DIFFERENT_NONZERO_PATTERN);
-	MatAXPY(Lk, 1, D, DIFFERENT_NONZERO_PATTERN);
+	MatCopy(A, Lk, SAME_NONZERO_PATTERN);
+	MatAXPY(Lk, 1, D, SAME_NONZERO_PATTERN);
 
 	return 0;
 }
@@ -153,7 +151,6 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 	//Output: r, f*
 
 	MatZeroEntries(r);
-	MatSetOption(r, MAT_NEW_NONZERO_LOCATIONS, PETSC_TRUE);
 	VecSet(fStar, 0);
 
 	Vec v1Over2, vtmp;
@@ -351,8 +348,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 			else
 				fi = fi + std::min(Rn_i[i], Rp_i[colsr[j]])*r_i[j];
 		}
-
-		VecSetValue(fStar, i, fi, INSERT_VALUES);
+		if (std::abs(fi)<1e23 && std::abs(fi)>1e-23)
+			VecSetValue(fStar, i, fi, INSERT_VALUES);
 		MatRestoreRow(r, i, &ncolsr, &colsr, &r_i);
 	}
 

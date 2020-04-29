@@ -171,7 +171,7 @@ int FixNaNValues(Vec &b) {
 		}
 	}
 
-	VecSetValues(b, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
+	VecSetValuesLocal(b, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
 
 	VecAssemblyBegin(b);
 	VecAssemblyEnd(b);
