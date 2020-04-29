@@ -1,0 +1,54 @@
+Thread safety and smart pointers:
+  http://www.comrite.com/wp/c-why-need-atomic_store-atomic_load-on-shared_ptr-atomic-shared_ptr/
+  https://en.cppreference.com/w/cpp/thread/mutex
+  https://stackoverflow.com/questions/14482830/stdshared-ptr-thread-safety
+  Create Threads/clusters/nodes:
+    https://mpitutorial.com/tutorials/introduction-to-groups-and-communicators/
+  MPI_Init_Threads:
+    http://wgropp.cs.illinois.edu/courses/cs598-s16/lectures/lecture36.pdf
+
+boost::mpi
+  https://cmake.org/gitweb?p=cmake.git;a=commitdiff;h=a22eeca3
+  work around:
+  https://github.com/boostorg/mpi/issues/112
+  cmake:
+    http://www.brianlheim.com/2018/04/09/cmake-cheat-sheet.html
+
+Weak form facts:
+  https://en.wikipedia.org/wiki/Vector_calculus_identities
+  https://en.wikipedia.org/wiki/Divergence_theorem
+  https://en.wikipedia.org/wiki/Surface_integral
+
+mesh topics:
+  https://fenicsproject.org/docs/dolfin/1.6.0/cpp/demo/documented/navier-stokes/cpp/documentation.html
+  https://fenicsproject.discourse.group/t/create-mesh-with-gmsh-convert-it-and-import-it-in-dolfin-problems/107/5
+  https://fenicsproject.org/docs/dolfin/1.6.0/cpp/programmers-reference/ale/index.html
+
+water dissociation:
+  https://www.chemteam.info/AcidBase/Kw.html
+
+third party fenicstools:
+  https://github.com/mikaem/fenicstools/wiki
+
+extension from submesh to mesh:
+  https://fenicsproject.org/qa/12282/change-values-function-mesh-function-defined-boundarymesh/
+  https://fenicsproject.discourse.group/t/how-to-map-dofs-of-vector-functions-between-meshes-boundarymeshes-submeshes/45/4
+
+Paraview Export Animation:
+  https://www.paraview.org/Wiki/Beginning_Pictures_and_Movies
+
+GIF Making:
+  https://www.youtube.com/watch?v=APJN1HCZS3U
+
+basic steps:
+  https://curc.readthedocs.io/en/latest/programming/MPI-C.html
+
+Book eijkhout:
+  http://pages.tacc.utexas.edu/~eijkhout/pcse/html/index.html
+  https://bitbucket.org/VictorEijkhout/parallel-computing-book/src/default/EijkhoutParComp.pdf
+
+Multifile coding:
+  https://www.learncpp.com/cpp-tutorial/42-global-variables/
+  http://www.math.uaa.alaska.edu/~afkjm/csce211/handouts/SeparateCompilation.pdf
+  https://stackoverflow.com/questions/4349553/multiple-source-files-in-c-how-exactly-do-makefiles-work
+  https://stackoverflow.com/questions/6921695/how-can-i-build-a-c-project-with-multiple-interdependent-subdirectories
