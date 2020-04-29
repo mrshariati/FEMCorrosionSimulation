@@ -64,8 +64,7 @@ double uDep(double iElectrode, double eps, double cMg, double cOH) {
 int BoundaryCurrent(std::vector<size_t> GlobalDOFSet_bar, double t, Vec cMg, Vec cOH, Vec cReactionLimiter, double eps0, double teta0, double l, Vec &Ii) {
 	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l
 	//Output: Ii
-
-	VecDuplicate(cMg, &Ii);
+	
 	VecSet(Ii, 0);
 
 	VecScatter par2seq;
