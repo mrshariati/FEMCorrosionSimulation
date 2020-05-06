@@ -11,14 +11,14 @@ phi = Coefficient(H)
 Ii = Coefficient(H)
 Ri = Coefficient(H)
 
-e = 1.60217662e-19
-k_B = 1.38064852e-23
-T = 275
+F = 96487
+R = 8.3145
+T = 295
 
-zrb = (1.60217662/(1.38064852*T))*1e4
+um = F/(R*T)
 
 #Create stiffness matrix
-a = Di*dot(grad(ci),grad(v))*dx + Di*zi*zrb*ci*dot(grad(phi),grad(v))*dx
+a = Di*inner(grad(ci),grad(v))*dx - zi*Di*um*ci*inner(grad(phi),grad(v))*dx
 L = Ri*v*dx - Ii*v*ds
 
 # ffc -l dolfin StiffnessMatrix.ufl

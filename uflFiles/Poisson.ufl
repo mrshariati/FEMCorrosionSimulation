@@ -6,9 +6,9 @@ v = TestFunction(H)
 f = Coefficient(H)
 
 e = 1.60217662e-19
-#xi = 80
+xi = 80
 
-a = inner(grad(phi), grad(v))*dx
+a = inner(xi*grad(phi), grad(v))*dx
 L = e*f*v*dx
 
 # ffc -l dolfin Poisson.ufl
