@@ -2682,36 +2682,40 @@ return enabled;
     const double J_c3 = coordinate_dofs[1] * FE3_C0_D01_Q1[0][0][0] + coordinate_dofs[5] * FE3_C0_D01_Q1[0][0][1];
     const double J_c1 = coordinate_dofs[0] * FE3_C0_D01_Q1[0][0][0] + coordinate_dofs[4] * FE3_C0_D01_Q1[0][0][1];
     const double J_c2 = coordinate_dofs[1] * FE3_C0_D01_Q1[0][0][0] + coordinate_dofs[3] * FE3_C0_D01_Q1[0][0][1];
-    alignas(32) double sp[20];
+    alignas(32) double sp[24];
     sp[0] = J_c0 * J_c3;
     sp[1] = J_c1 * J_c2;
     sp[2] = sp[0] + -1 * sp[1];
     sp[3] = J_c0 / sp[2];
     sp[4] = -1 * J_c1 / sp[2];
-    sp[5] = sp[3] * sp[3];
-    sp[6] = sp[3] * sp[4];
-    sp[7] = sp[4] * sp[4];
-    sp[8] = J_c3 / sp[2];
-    sp[9] = -1 * J_c2 / sp[2];
-    sp[10] = sp[9] * sp[9];
-    sp[11] = sp[8] * sp[9];
-    sp[12] = sp[8] * sp[8];
-    sp[13] = sp[5] + sp[10];
-    sp[14] = sp[6] + sp[11];
-    sp[15] = sp[12] + sp[7];
-    sp[16] = std::abs(sp[2]);
-    sp[17] = sp[13] * sp[16];
-    sp[18] = sp[14] * sp[16];
-    sp[19] = sp[15] * sp[16];
-    A[0] = 0.5 * sp[19] + 0.5 * sp[18] + 0.5 * sp[18] + 0.5 * sp[17];
-    A[1] = -0.5 * sp[19] + -0.5 * sp[18];
-    A[2] = -0.5 * sp[18] + -0.5 * sp[17];
-    A[3] = -0.5 * sp[19] + -0.5 * sp[18];
-    A[4] = 0.5 * sp[19];
-    A[5] = 0.5 * sp[18];
-    A[6] = -0.5 * sp[18] + -0.5 * sp[17];
-    A[7] = 0.5 * sp[18];
-    A[8] = 0.5 * sp[17];
+    sp[5] = 80 * sp[3] * sp[3];
+    sp[6] = 80 * sp[4] * sp[3];
+    sp[7] = 80 * sp[3] * sp[4];
+    sp[8] = 80 * sp[4] * sp[4];
+    sp[9] = J_c3 / sp[2];
+    sp[10] = -1 * J_c2 / sp[2];
+    sp[11] = 80 * sp[10] * sp[10];
+    sp[12] = 80 * sp[9] * sp[10];
+    sp[13] = 80 * sp[10] * sp[9];
+    sp[14] = 80 * sp[9] * sp[9];
+    sp[15] = sp[5] + sp[11];
+    sp[16] = sp[6] + sp[12];
+    sp[17] = sp[13] + sp[7];
+    sp[18] = sp[14] + sp[8];
+    sp[19] = std::abs(sp[2]);
+    sp[20] = sp[15] * sp[19];
+    sp[21] = sp[16] * sp[19];
+    sp[22] = sp[17] * sp[19];
+    sp[23] = sp[18] * sp[19];
+    A[0] = 0.5 * sp[23] + 0.5 * sp[22] + 0.5 * sp[21] + 0.5 * sp[20];
+    A[1] = -0.5 * sp[23] + -0.5 * sp[21];
+    A[2] = -0.5 * sp[22] + -0.5 * sp[20];
+    A[3] = -0.5 * sp[23] + -0.5 * sp[22];
+    A[4] = 0.5 * sp[23];
+    A[5] = 0.5 * sp[22];
+    A[6] = -0.5 * sp[21] + -0.5 * sp[20];
+    A[7] = 0.5 * sp[21];
+    A[8] = 0.5 * sp[20];
   }
 
 };
@@ -2819,7 +2823,7 @@ public:
 
   const char * signature() const final override
   {
-    return "ca9e769829da10586276dc8215b89d031b1cb9f17871781a48837ba142fbdfb42fbfe390c4b6f692389447e6f71f868bba1d29b84223cbe14805b6111dfbe504";
+    return "e52db2492eca688306a27b38128067887db24b9aeb62a5da822ee00601182927077b129fe1e0f51b61f91636a2afbf84b06667373d1a712d8425b4beb60d8421";
   }
 
   std::size_t rank() const final override

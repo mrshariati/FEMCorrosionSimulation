@@ -4,14 +4,15 @@ using namespace dolfin;
 
 //DOI:10.1007/978-3-642-00605-0
 //Flux-corrected-transport finite element method
-int FEMFCT_Lk_D_Compute(Mat A, Mat &D, Mat &Lk) {
+int FEMFCT_Lk_D_Compute(Mat A, Mat &Dk, Mat &Lk) {
 	//Input: A
 	//Output: D, Lk
 
-	Mat ATr;
-	MatCreateTranspose(A, &ATr);
+	MatZeroEntries(Dk);
+	MatZeroEntries(Lk);
 
-	MatZeroEntries(D);
+	Mat ATr;
+	MatTranspose(A, MAT_INITIAL_MATRIX, &ATr);
 
 	PetscInt A_FromRow;
 	PetscInt A_ToRow;
@@ -81,12 +82,11 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &D, Mat &Lk) {
 			}
 			k = k + 1;
 		}
-
 		MatRestoreRow(A, i, &ncolsA, &colsA, &a_i);
 		MatRestoreRow(ATr, i, &ncolsATr, &colsATr, &a_j);
 
-		MatSetValues(D, 1, &i, d_ind.size(), d_ind.data(), d_i.data(), INSERT_VALUES);
-		MatSetValues(D, d_ind.size(), d_ind.data(), 1, &i, d_i.data(), INSERT_VALUES);
+		MatSetValues(Dk, 1, &i, d_ind.size(), d_ind.data(), d_i.data(), INSERT_VALUES);
+		MatSetValues(Dk, d_ind.size(), d_ind.data(), 1, &i, d_i.data(), INSERT_VALUES);
 
 		d_i.clear();
 		d_i.shrink_to_fit();
@@ -94,30 +94,36 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &D, Mat &Lk) {
 		d_ind.shrink_to_fit();
 	}
 
-	MatAssemblyBegin(D, MAT_FINAL_ASSEMBLY);
-	MatAssemblyEnd(D, MAT_FINAL_ASSEMBLY);
+	MatAssemblyBegin(Dk, MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(Dk, MAT_FINAL_ASSEMBLY);
+
+	MatDestroy(&ATr);
 
 	Vec vtmp;//setting the diagonal of D
 	MatCreateVecs(A, NULL, &vtmp);
 	VecSet(vtmp, 0);
-	MatDiagonalSet(D, vtmp, INSERT_VALUES);
 
 	PetscBarrier(NULL);
 
-	MatDestroy(&ATr);
+	MatDiagonalSet(Dk, vtmp, INSERT_VALUES);
 
-	MatGetRowSum(D, vtmp);
+	PetscBarrier(NULL);
+
+	MatGetRowSum(Dk, vtmp);
 	VecScale(vtmp, -1);
-	MatDiagonalSet(D, vtmp, INSERT_VALUES);
+
+	PetscBarrier(NULL);
+
+	MatDiagonalSet(Dk, vtmp, INSERT_VALUES);
 
 	PetscBarrier(NULL);
 
 	VecDestroy(&vtmp);
 
-	MatZeroEntries(Lk);
-
 	MatCopy(A, Lk, SAME_NONZERO_PATTERN);
-	MatAXPY(Lk, 1, D, SAME_NONZERO_PATTERN);
+	MatAXPY(Lk, 1, Dk, SAME_NONZERO_PATTERN);
+
+	PetscBarrier(NULL);
 
 	return 0;
 }
@@ -131,11 +137,20 @@ int FEMFCT_dt_Compute(Mat ML, Mat Lk, PetscReal &dt) {
 	Vec vtmp1, vtmp2;
 
 	MatCreateVecs(ML, NULL, &vtmp1);
-	MatCreateVecs(Lk, NULL, &vtmp2);
+
+	PetscBarrier(NULL);
+
+	VecDuplicate(vtmp1, &vtmp2);
 
 	MatGetDiagonal(ML, vtmp1);
 	MatGetDiagonal(Lk, vtmp2);
+
+	PetscBarrier(NULL);
+
 	VecPointwiseDivide(vtmp1, vtmp1, vtmp2);
+
+	PetscBarrier(NULL);
+
 	VecMin(vtmp1, NULL, &dt);
 	dt = 2*dt;
 	if(dt>1e-3)
@@ -146,8 +161,8 @@ int FEMFCT_dt_Compute(Mat ML, Mat Lk, PetscReal &dt) {
 
 //DOI:10.1016/j.cma.2008.08.016
 //Flux-corrected-transport finite element method
-int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscReal dt, Mat &r, Vec &fStar) {
-	//Input: ML, MC, Dk, Lk, ck, bk, dt
+int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0, PetscReal dt, Mat &r, Vec &fStar) {
+	//Input: ML, MC, D1, D0, L0, c0, b0, dt
 	//Output: r, f*
 
 	MatZeroEntries(r);
@@ -155,14 +170,19 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 
 	Vec v1Over2, vtmp;
 
-	MatCreateVecs(Lk, NULL, &v1Over2);
+	MatCreateVecs(L0, NULL, &v1Over2);
+
+	PetscBarrier(NULL);
+
+	VecDuplicate(v1Over2, &vtmp);
 	VecSet(v1Over2, 0);
-	MatCreateVecs(Lk, NULL, &vtmp);
 	VecSet(vtmp, 0);
 
+	PetscBarrier(NULL);
+
 	//v_half
-	VecCopy(bk, v1Over2);
-	MatMult(Lk, ck, vtmp);
+	VecCopy(b0, v1Over2);
+	MatMult(L0, c0, vtmp);
 
 	PetscBarrier(NULL);
 
@@ -174,11 +194,13 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 
 	//each processor needs other processors indices
 	VecScatter par2seq;
-	Vec ck_SEQ, v1Over2_SEQ;
+	Vec c0_SEQ, v1Over2_SEQ;
 
-	VecScatterCreateToAll(ck, &par2seq, &ck_SEQ);
-	VecScatterBegin(par2seq, ck, ck_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(par2seq, ck, ck_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterCreateToAll(c0, &par2seq, &c0_SEQ);
+	VecScatterBegin(par2seq, c0, c0_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(par2seq, c0, c0_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+
+	PetscBarrier(NULL);
 
 	VecScatterDestroy(&par2seq);
 
@@ -186,39 +208,43 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 	VecScatterBegin(par2seq, v1Over2, v1Over2_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(par2seq, v1Over2, v1Over2_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 
+	PetscBarrier(NULL);
+
 	VecScatterDestroy(&par2seq);
 	VecDestroy(&vtmp);
 	VecDestroy(&v1Over2);
 
 	//r
-	PetscInt Lk_FromRow;
-	PetscInt Lk_ToRow;
+	PetscInt L0_FromRow;
+	PetscInt L0_ToRow;
 
-	MatGetOwnershipRange(Lk, &Lk_FromRow, &Lk_ToRow);
+	MatGetOwnershipRange(L0, &L0_FromRow, &L0_ToRow);
 
 	Vec Rp, Rn;
-	VecDuplicate(ck_SEQ, &Rp);
+	VecDuplicate(c0_SEQ, &Rp);
 	VecSet(Rp, 1);
-	VecDuplicate(ck_SEQ, &Rn);
+	VecDuplicate(c0_SEQ, &Rn);
 	VecSet(Rn, 1);
 
-	const PetscScalar* ck_i;
+	const PetscScalar* c0_i;
 	const PetscScalar* v_i;
 
-	VecGetArrayRead(ck_SEQ, &ck_i);
+	VecGetArrayRead(c0_SEQ, &c0_i);
 	VecGetArrayRead(v1Over2_SEQ, &v_i);
 
-	for (PetscInt i = Lk_FromRow; i < Lk_ToRow; i = i + 1) {
+	for (PetscInt i = L0_FromRow; i < L0_ToRow; i = i + 1) {
 		const PetscScalar* mc_i;
 		const PetscInt* colsMC;
 		PetscInt ncolsMC;
 
-		const PetscScalar* d_i;
-		const PetscInt* colsD;
-		PetscInt ncolsD;
+		const PetscScalar* d1_i;
+		const PetscScalar* d0_i;
+		const PetscInt* colsD0;
+		PetscInt ncolsD0;
 
 		MatGetRow(MC, i, &ncolsMC, &colsMC, &mc_i);
-		MatGetRow(Dk, i, &ncolsD, &colsD, &d_i);
+		MatGetRow(D0, i, &ncolsD0, &colsD0, &d0_i);
+		MatGetRow(D1, i, NULL, NULL, &d1_i);
 
 		std::vector<PetscScalar> ri;
 		std::vector<PetscInt> ri_ind;
@@ -227,42 +253,42 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 
 		PetscScalar Ppi = 0;
 		PetscScalar Pni = 0;
-		PetscScalar Qpi = ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];
-		PetscScalar Qni = ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i];
+		PetscScalar Qpi = c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i];
+		PetscScalar Qni = c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i];
 		PetscScalar mi = 0;
 
-		while (j < ncolsMC && k < ncolsD) { 
-			if (colsMC[j] < colsD[k]) {
+		while (j < ncolsMC && k < ncolsD0) { 
+			if (colsMC[j] < colsD0[k]) {
 				ri_ind.push_back(colsMC[j]);
 				ri.push_back(dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
 				if (colsMC[j] != i) {
 					Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
 					Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
-					Qpi = std::max(Qpi, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
-					Qni = std::min(Qni, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
+					Qpi = std::max(Qpi, c0_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - c0_i[i] - 0.5*dt*v_i[i]);
+					Qni = std::min(Qni, c0_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - c0_i[i] - 0.5*dt*v_i[i]);
 				}
 				mi = mi + mc_i[j];
 				j = j + 1;
 			}
-			else if (colsD[k] < colsMC[j]) {
-				ri_ind.push_back(colsD[k]);
-				ri.push_back(-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-				if (colsD[k] != i) {
-					Ppi = Ppi + std::max(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-					Pni = Pni + std::min(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-					Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
-					Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
+			else if (colsD0[k] < colsMC[j]) {
+				ri_ind.push_back(colsD0[k]);
+				ri.push_back(-0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+				if (colsD0[k] != i) {
+					Ppi = Ppi + std::max(double(0), -0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+					Pni = Pni + std::min(double(0), -0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+					Qpi = std::max(Qpi, c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i]);
+					Qni = std::min(Qni, c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i]);
 				}
 				k = k + 1;
 			}
 			else {
-				ri_ind.push_back(colsD[k]);
-				ri.push_back(dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-				if (colsD[k] != i) {
-					Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-					Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-					Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
-					Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
+				ri_ind.push_back(colsD0[k]);
+				ri.push_back(dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+				if (colsD0[k] != i) {
+					Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+					Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]])-0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+					Qpi = std::max(Qpi, c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i]);
+					Qni = std::min(Qni, c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i]);
 				}
 				mi = mi + mc_i[j];
 				k = k + 1;
@@ -275,20 +301,20 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 			if (colsMC[j] != i) {
 				Ppi = Ppi + std::max(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
 				Pni = Pni + std::min(double(0), dt*mc_i[j]*(v_i[i]-v_i[colsMC[j]]));
-				Qpi = std::max(Qpi, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
-				Qni = std::min(Qni, ck_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - ck_i[i] - 0.5*dt*v_i[i]);
+				Qpi = std::max(Qpi, c0_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - c0_i[i] - 0.5*dt*v_i[i]);
+				Qni = std::min(Qni, c0_i[colsMC[j]] + 0.5*dt*v_i[colsMC[j]] - c0_i[i] - 0.5*dt*v_i[i]);
 			}
 			mi = mi + mc_i[j];
 			j = j + 1;
 		}
-		while(k < ncolsD) {
-			ri_ind.push_back(colsD[k]);
-			ri.push_back(-dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-			if (colsD[k] != i) {
-				Ppi = Ppi + std::max(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-				Pni = Pni + std::min(double(0), -dt*d_i[k]*(ck_i[i]+0.5*dt*v_i[i]-ck_i[colsD[k]]-0.5*dt*v_i[colsD[k]]));
-				Qpi = std::max(Qpi, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
-				Qni = std::min(Qni, ck_i[colsD[k]] + 0.5*dt*v_i[colsD[k]] - ck_i[i] - 0.5*dt*v_i[i]);
+		while(k < ncolsD0) {
+			ri_ind.push_back(colsD0[k]);
+			ri.push_back(-0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+			if (colsD0[k] != i) {
+				Ppi = Ppi + std::max(double(0), -0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+				Pni = Pni + std::min(double(0), -0.5*dt*(dt*d1_i[k]*(v_i[i]-v_i[colsD0[k]]) + d1_i[k]*(c0_i[i]-c0_i[colsD0[k]]) + d0_i[k]*(c0_i[i]-c0_i[colsD0[k]])));
+				Qpi = std::max(Qpi, c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i]);
+				Qni = std::min(Qni, c0_i[colsD0[k]] + 0.5*dt*v_i[colsD0[k]] - c0_i[i] - 0.5*dt*v_i[i]);
 			}
 			k = k + 1;
 		}
@@ -304,7 +330,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 		}
 
 		MatRestoreRow(MC, i, &ncolsMC, &colsMC, &mc_i);
-		MatRestoreRow(Dk, i, &ncolsD, &colsD, &d_i);
+		MatRestoreRow(D0, i, &ncolsD0, &colsD0, &d0_i);
+		MatRestoreRow(D1, i, NULL, NULL, &d1_i);
 
 		ri_ind.clear();
 		ri.shrink_to_fit();
@@ -318,12 +345,10 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 	MatAssemblyBegin(r, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(r, MAT_FINAL_ASSEMBLY);
 
-	PetscBarrier(NULL);
-
-	VecRestoreArrayRead(ck_SEQ, &ck_i);
+	VecRestoreArrayRead(c0_SEQ, &c0_i);
 	VecRestoreArrayRead(v1Over2_SEQ, &v_i);
 
-	VecDestroy(&ck_SEQ);
+	VecDestroy(&c0_SEQ);
 	VecDestroy(&v1Over2_SEQ);
 
 	// Zalesak's algorithm
@@ -333,7 +358,7 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 	VecGetArrayRead(Rp, &Rp_i);
 	VecGetArrayRead(Rn, &Rn_i);
 
-	for (PetscInt i = Lk_FromRow; i < Lk_ToRow; i = i + 1) {
+	for (PetscInt i = L0_FromRow; i < L0_ToRow; i = i + 1) {
 		const PetscScalar* r_i;
 		const PetscInt* colsr;
 		PetscInt ncolsr;
@@ -359,8 +384,6 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat Dk, Mat Lk, Vec ck, Vec bk, PetscRe
 	VecRestoreArrayRead(Rp, &Rp_i);
 	VecRestoreArrayRead(Rn, &Rn_i);
 
-	PetscBarrier(NULL);
-
 	VecDestroy(&Rp);
 	VecDestroy(&Rn);
 
@@ -373,12 +396,16 @@ int FEMFCT_ML_Compute(Mat MC, Mat &ML) {
 	//Input: MC
 	//Output: ML
 
+	MatZeroEntries(ML);
+
 	Vec vtmp;
 	MatCreateVecs(MC, NULL, &vtmp);
+
+	PetscBarrier(NULL);
+
 	MatGetRowSum(MC, vtmp);
 
 	//ML
-	MatZeroEntries(ML);
 	MatDiagonalSet(ML, vtmp, INSERT_VALUES);
 
 	PetscBarrier(NULL);

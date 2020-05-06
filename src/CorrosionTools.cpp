@@ -24,7 +24,8 @@ double epsODE(double t, double eps0, double cMg, double cOH) {
 	double A;
 	konst = (7.4e-4*0.058)/2360;
 	A = cMg*cOH*cOH - 0.450;
-	konst = konst*A;
+	if(A >= 0)
+		konst = konst*A;
 	double eps = std::exp(-konst*t+std::log(eps0));//eps=exp(-konst*t+ln(eps0))
 	return eps;
 }
@@ -74,17 +75,23 @@ int BoundaryCurrent(std::vector<size_t> GlobalDOFSet_bar, double t, Vec cMg, Vec
 	VecScatterBegin(par2seq, cMg, cMg_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(par2seq, cMg, cMg_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 
+	PetscBarrier(NULL);
+
 	VecScatterDestroy(&par2seq);
 
 	VecScatterCreateToAll(cOH, &par2seq, &cOH_SEQ);
 	VecScatterBegin(par2seq, cOH, cOH_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(par2seq, cOH, cOH_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 
+	PetscBarrier(NULL);
+
 	VecScatterDestroy(&par2seq);
 
 	VecScatterCreateToAll(cReactionLimiter, &par2seq, &cR_SEQ);
 	VecScatterBegin(par2seq, cReactionLimiter, cR_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 	VecScatterEnd(par2seq, cReactionLimiter, cR_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+
+	PetscBarrier(NULL);
 
 	VecScatterDestroy(&par2seq);
 

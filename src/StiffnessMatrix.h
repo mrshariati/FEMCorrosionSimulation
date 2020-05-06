@@ -3178,8 +3178,8 @@ return enabled;
     sp[17] = sp[8] + sp[15];
     sp[18] = sp[16] + sp[9];
     sp[19] = w[0][0] * w[1][0];
-    sp[20] = sp[17] * (42.19826201675137 * sp[19]);
-    sp[21] = sp[18] * (42.19826201675137 * sp[19]);
+    sp[20] = sp[17] * (39.33785269964356 * sp[19]);
+    sp[21] = sp[18] * (39.33785269964356 * sp[19]);
     sp[22] = sp[3] * sp[3];
     sp[23] = sp[3] * sp[4];
     sp[24] = sp[4] * sp[4];
@@ -3193,10 +3193,10 @@ return enabled;
     sp[32] = sp[29] * w[0][0];
     sp[33] = sp[30] * w[0][0];
     sp[34] = std::abs(sp[2]);
-    sp[35] = sp[20] * sp[34];
+    sp[35] = -1 * sp[20] * sp[34];
     sp[36] = sp[31] * sp[34];
     sp[37] = sp[32] * sp[34];
-    sp[38] = sp[21] * sp[34];
+    sp[38] = -1 * sp[21] * sp[34];
     sp[39] = sp[33] * sp[34];
     A[0] = 0.5 * sp[39] + -0.1666666666666667 * sp[38] + 0.5 * sp[37] + 0.5 * sp[37] + -0.1666666666666667 * sp[35] + 0.5 * sp[36];
     A[1] = -0.5 * sp[39] + -0.1666666666666667 * sp[38] + -0.5 * sp[37] + -0.1666666666666667 * sp[35];
@@ -3410,7 +3410,7 @@ public:
 
   const char * signature() const final override
   {
-    return "03adb8f32da0746d80e61fe7a8a2f4ed499ca9646babb84ffe73e56900f434ec31f8a4605c2ab2390d5205d26b03dbfaf748a428cb17fe7b60cfb75813b5a991";
+    return "9ef58928a9cbf2c604835e3b4a37c741bd5e4e838056c9dc1890e326caeff5e67469b2554d6ddb36f05a5878f658a58083a7f25bf40bdf6bafc2299f65cc4ec0";
   }
 
   std::size_t rank() const final override
