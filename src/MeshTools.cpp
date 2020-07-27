@@ -434,3 +434,16 @@ int BoundaryMarking(std::vector<std::shared_ptr<dolfin::SubDomain>> &bcs, std::v
 	return 0;
 }
 
+//to convert a mesh from xdmf to xml
+int Mesh_XDMF2XML(std::string XDMFFileName="mesh.xdmf", std::string XMLFileName="mesh.xml") {
+
+	dolfin::Mesh mesh;
+	dolfin::XDMFFile XDMFStream(XDMFFileName);
+	XDMFStream.read(mesh);
+
+	dolfin::File XMLStream(XMLFileName);
+	XMLStream<<(mesh);
+
+	return 0;
+}
+

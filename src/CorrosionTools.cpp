@@ -12,7 +12,7 @@ double tetaODE(double t, double teta0, double l, double eps, double cMg, double 
 	A = cMg*cOH*cOH - 0.450;
 	if(A >= 0)
 		konst = konst*A;
-	double teta = std::exp(-konst*t+std::log(1-teta0)) + 1;//teta=-exp(-konst*t+ln(1-teta0))+1
+	double teta = 1-(1-teta0)*std::exp(-konst*t);//teta=-exp(-konst*t+ln(1-teta0))+1
 	return teta;
 }
 
@@ -24,108 +24,169 @@ double epsODE(double t, double eps0, double cMg, double cOH) {
 	double A;
 	konst = (7.4e-4*0.058)/2360;
 	A = cMg*cOH*cOH - 0.450;
-	konst = konst*A;
-	double eps = std::exp(-konst*t+std::log(eps0));//eps=exp(-konst*t+ln(eps0))
+	if(A >= 0)
+		konst = konst*A;
+	double eps = eps0*std::exp(-konst*t);//eps=exp(-konst*t+ln(eps0))
 	return eps;
 }
 
 //Doi: 10.1149/2.0071501jes
-//iElectrode:=absolute current
-//EQ[12]==EQ[13]=>phi=-1.4201232315167845415877017558844 Solved in matlab
+//iExchange:=absolute current
+//EQ[12]==EQ[13]=>phi=-1.48429655 Solved in matlab
 //Matlab command:
-//syms phi
-//eq =(7*exp((10608857842922292*phi)/674214345399337 + 4023409336928279241/168553586349834250))/250 - (7*exp(- (8487086274337833*phi)/674214345399337 - 12874909878170492661/674214345399337000))/250 == (9*10^(phi/118 + 119/23600))/500 + (13*exp(phi/500 + 119/100000))/(125*((52*exp(phi/500 + 119/100000))/4335 + 1))
-//solve(eq, phi)
+//U_Electrolyte=-1.51:0.0001:-1.4;%-1.462456
+//U=U_Electrolyte;
+//iMg=(0.28.*(exp(39.31786.*0.4.*(U+1.517))-exp(-39.31786.*0.32.*(U+1.517))));
+//iAl=((0.104.*exp(1e3.*(U+0.595)./500)./(0.012.*exp(1e3.*(U+0.595)./500)+1)+0.18.*10.^(-1e3.*(U+1.41)./118)));seems one has mA/cm^2 and the other A/m^2
+//plot(U,iAl-iMg,'b')
+//iMg=iAl=0.51928 A/(m)^2
 //End Matlab command
-//iAl=iMg=0.120312326899797
+
+//equilibrium potential depends on combination of metals and we took E_eq=1.48
 double iElectrodeFormula(double teta, double eps) {
 	double iExchange;
-	iExchange = 0.12031232;
-	return (1 - teta + eps*teta)*iExchange*10; //mA/(cm)^2--->A/m^2
+	iExchange = 0.51928;
+	return (1 - teta + eps*teta)*iExchange;
 }
 
 //Doi: 10.1149/2.0071501jes
 //Moving interface velocity uTotal
 //EQ[16]
 double uTotal(double iElectrode, double eps, double cMg, double cOH) {
-	return -(0.024*iElectrode)/(2*96487*1735) + (7.4e-4*(cMg*cOH*cOH - 0.45)*0.058) / ((1 - eps)*2450);
+	return -(0.024*iElectrode)/(2*96487*1735) + (7.4e-4*(cMg*cOH*cOH - 0.45)*0.058) / ((1 - eps)*2360);
 }
 //Cor:=Corrosion
 double uCor(double iElectrode) {
 	return -(0.024*iElectrode)/(2*96487*1735);
 }
 //Dep:=Deposit
-double uDep(double iElectrode, double eps, double cMg, double cOH) {
-	return (7.4e-4*(cMg*cOH*cOH - 0.45)*0.058)/((1 - eps)*2450);
+double uDep(double eps, double cMg, double cOH) {
+	double konst;
+	double A;
+	konst = (7.4e-4*0.058);
+	A = cMg*cOH*cOH - 0.450;
+	if(A >= 0)
+		konst = konst*A;
+	return konst/((1 - eps)*2360);
+}
+
+double Current2ElectricField(std::vector<double> Phi, std::vector<double> i, double i_t) {
+	//Linear spline interpolation with free knot at the boundaries
+
+	double ilower_bound = std::abs(i_t - i[0]);
+	size_t occurance = 0;
+	for (size_t k=1; k<i.size(); k=k+1) {
+		if (std::abs(i_t-i[k])<ilower_bound) {
+			ilower_bound = std::abs(i_t-i[k]);
+			occurance = k;
+		}
+	}
+	if (occurance==0 && i_t < i[occurance])
+		return Phi[occurance]+((i_t-i[occurance])/(i[occurance+1]-i[occurance]))*(Phi[occurance+1]-Phi[occurance]);
+	else if (occurance==(i.size()-1) && i_t >= i[occurance])
+		return Phi[occurance]+((i_t-i[occurance])/(i[occurance]-i[occurance-1]))*(Phi[occurance]-Phi[occurance-1]);
+	else {
+		if (i_t < i[occurance])
+			return Phi[occurance]+((i_t-i[occurance])/(i[occurance]-i[occurance-1]))*(Phi[occurance]-Phi[occurance-1]);
+		else
+			return Phi[occurance]+((i_t-i[occurance])/(i[occurance+1]-i[occurance]))*(Phi[occurance+1]-Phi[occurance]);
+	}
 }
 
 //Doi: 10.1149/2.0071501jes
-//EQ[11]
-int BoundaryCurrent(std::vector<size_t> GlobalDOFSet_bar, double t, Vec cMg, Vec cOH, Vec cReactionLimiter, double eps0, double teta0, double l, Vec &Ii) {
-	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l
+//EQ[11], EQ[12]
+int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double eps0, double teta0, double l0, Vec &Ii, Vec &BoundaryPhi, std::vector<double> UData, std::vector<double> iMgData) {
+	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l0
 	//Output: Ii
 
 	VecSet(Ii, 0);
 
-	VecScatter par2seq;
-	Vec cMg_SEQ, cOH_SEQ, cR_SEQ;
-
-	VecScatterCreateToAll(cMg, &par2seq, &cMg_SEQ);
-	VecScatterBegin(par2seq, cMg, cMg_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(par2seq, cMg, cMg_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-
-	VecScatterDestroy(&par2seq);
-
-	VecScatterCreateToAll(cOH, &par2seq, &cOH_SEQ);
-	VecScatterBegin(par2seq, cOH, cOH_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(par2seq, cOH, cOH_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-
-	VecScatterDestroy(&par2seq);
-
-	VecScatterCreateToAll(cReactionLimiter, &par2seq, &cR_SEQ);
-	VecScatterBegin(par2seq, cReactionLimiter, cR_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-	VecScatterEnd(par2seq, cReactionLimiter, cR_SEQ, INSERT_VALUES, SCATTER_FORWARD);
-
-	VecScatterDestroy(&par2seq);
-
 	PetscScalar eps;
+	PetscScalar l;
 	PetscScalar teta;
 	PetscScalar iElectrode;
+	PetscScalar UElectrode;
 
 	const PetscScalar* cMg_i;
 	const PetscScalar* cOH_i;
-	const PetscScalar* cReactionLimiter_i;
 
-	VecGetArrayRead(cMg_SEQ, &cMg_i);
-	VecGetArrayRead(cOH_SEQ, &cOH_i);
-	VecGetArrayRead(cR_SEQ, &cReactionLimiter_i);
+	VecGetArrayRead(cMg, &cMg_i);
+	VecGetArrayRead(cOH, &cOH_i);
 
 	//Computing the electerical current
-	for (size_t j = 0; j < GlobalDOFSet_bar.size(); j = j + 1) {
-		eps = epsODE(t, eps0, cMg_i[GlobalDOFSet_bar[j]], cOH_i[GlobalDOFSet_bar[j]]);
-		teta = tetaODE(t, teta0, l, eps, cMg_i[GlobalDOFSet_bar[j]], cOH_i[GlobalDOFSet_bar[j]]);
+	for (size_t j = 0; j < LocalDOFSet_bar.size(); j = j + 1) {
+		eps = epsODE(t, eps0, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
+		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*t + l0;
+		teta = tetaODE(t, teta0, l, eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
+//if((1 - teta + eps*teta)>0.9||(1 - teta + eps*teta)<0.5){std::cout<<"iMg_reduced issue: "<<"teta = "<<teta<<", eps = "<<eps<<", l_dep = "<<l<<std::endl;std::cin>>iElectrode;}
 		iElectrode = iElectrodeFormula(teta, eps);
-		if(iElectrode<=cReactionLimiter_i[GlobalDOFSet_bar[j]])
-			VecSetValue(Ii, GlobalDOFSet_bar[j], iElectrode, INSERT_VALUES);
-		else
-			VecSetValue(Ii, GlobalDOFSet_bar[j], cReactionLimiter_i[GlobalDOFSet_bar[j]], INSERT_VALUES);
+		VecSetValueLocal(Ii, LocalDOFSet_bar[j], iElectrode, INSERT_VALUES);
+		//extracting dirichlet condition for electric field
+		UElectrode = Current2ElectricField(UData, iMgData, iElectrode);
+		VecSetValueLocal(BoundaryPhi, LocalDOFSet_bar[j], UElectrode, INSERT_VALUES);
 	}
 
 	VecAssemblyBegin(Ii);
 	VecAssemblyEnd(Ii);
 
-	VecRestoreArrayRead(cMg, &cMg_i);
-	VecRestoreArrayRead(cOH, &cOH_i);
-	VecRestoreArrayRead(cReactionLimiter, &cReactionLimiter_i);
+	VecAssemblyBegin(BoundaryPhi);
+	VecAssemblyEnd(BoundaryPhi);
 
 	PetscBarrier(NULL);
 
-	VecDestroy(&cMg_SEQ);
-	VecDestroy(&cOH_SEQ);
-	VecDestroy(&cR_SEQ);
+	VecRestoreArrayRead(cMg, &cMg_i);
+	VecRestoreArrayRead(cOH, &cOH_i);
 
 	return 0;
 }
+
+//Doi: 10.1149/2.0071501jes
+//EQ[11], EQ[13]
+int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double eps0, double teta0, double l0, Vec &Ii, Vec &BoundaryPhi, std::vector<double> UData, std::vector<double> iAlData) {
+	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l0
+	//Output: Ii
+
+	VecScale(Ii, 2);
+
+	PetscScalar eps;
+	PetscScalar l;
+	PetscScalar teta;
+	PetscScalar iElectrode;
+	PetscScalar UElectrode;
+
+	const PetscScalar* cMg_i;
+	const PetscScalar* cOH_i;
+
+	VecGetArrayRead(cMg, &cMg_i);
+	VecGetArrayRead(cOH, &cOH_i);
+
+	//Computing the electerical current
+	for (size_t j = 0; j < LocalDOFSet_bar.size(); j = j + 1) {
+		eps = epsODE(t, eps0, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
+		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*t + l0;
+		teta = tetaODE(t, teta0, l, eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
+//if((1 - teta + eps*teta)>0.9||(1 - teta + eps*teta)<0.5){std::cout<<"iOH_reduced issue: "<<"teta = "<<teta<<", eps = "<<eps<<", u_dep = "<<uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])<<std::endl;std::cin>>iElectrode;}
+		iElectrode = iElectrodeFormula(teta, eps);
+		VecSetValueLocal(Ii, LocalDOFSet_bar[j], iElectrode, INSERT_VALUES);
+		//extracting dirichlet condition for electric field
+		UElectrode = Current2ElectricField(UData, iAlData, iElectrode);
+		VecSetValueLocal(BoundaryPhi, LocalDOFSet_bar[j], UElectrode, INSERT_VALUES);
+	}
+
+	VecAssemblyBegin(Ii);
+	VecAssemblyEnd(Ii);
+
+	VecAssemblyBegin(BoundaryPhi);
+	VecAssemblyEnd(BoundaryPhi);
+
+	PetscBarrier(NULL);
+
+	VecRestoreArrayRead(cMg, &cMg_i);
+	VecRestoreArrayRead(cOH, &cOH_i);
+
+	return 0;
+}
+
 
 //Doi: 10.1149/2.0071501jes
 //EQ[5]
@@ -159,6 +220,31 @@ int WaterDissociation(Vec cH, Vec cOH, Vec &Reaction) {
 	PetscBarrier(NULL);
 
 	VecDestroy(&vtmp);
+
+	return 0;
+}
+
+int PolarizationDataAssign(std::vector<double> &Phi, std::vector<double> &iMg, std::vector<double> &iAl, std::string Phifile, std::string iMgfile, std::string iAlfile) {
+
+	double val;
+	std::ifstream Myinputfile;
+	Myinputfile.open(Phifile);
+	while(Myinputfile>>val)
+		Phi.push_back(val);
+	Myinputfile.close();
+	Myinputfile.clear();
+
+	Myinputfile.open(iMgfile);
+	while(Myinputfile>>val)
+		iMg.push_back(val);
+	Myinputfile.close();
+	Myinputfile.clear();
+
+	Myinputfile.open(iAlfile);
+	while(Myinputfile>>val)
+		iAl.push_back(val);
+	Myinputfile.close();
+	Myinputfile.clear();
 
 	return 0;
 }

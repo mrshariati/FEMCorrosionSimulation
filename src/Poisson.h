@@ -2700,9 +2700,9 @@ return enabled;
     sp[14] = sp[6] + sp[11];
     sp[15] = sp[12] + sp[7];
     sp[16] = std::abs(sp[2]);
-    sp[17] = sp[13] * sp[16];
-    sp[18] = sp[14] * sp[16];
-    sp[19] = sp[15] * sp[16];
+    sp[17] = 90 * sp[13] * sp[16];
+    sp[18] = 90 * sp[14] * sp[16];
+    sp[19] = 90 * sp[15] * sp[16];
     A[0] = 0.5 * sp[19] + 0.5 * sp[18] + 0.5 * sp[18] + 0.5 * sp[17];
     A[1] = -0.5 * sp[19] + -0.5 * sp[18];
     A[2] = -0.5 * sp[18] + -0.5 * sp[17];
@@ -2733,7 +2733,7 @@ public:
 
   const std::vector<bool> & enabled_coefficients() const final override
   {
-static const std::vector<bool> enabled({true});
+static const std::vector<bool> enabled({true, false});
 return enabled;
   }
 
@@ -2790,10 +2790,106 @@ return enabled;
         for (int ic = 0; ic < 3; ++ic)
             w0 += w[0][ic] * FE3_C0_Q3[0][iq][ic];
         alignas(32) double sv3[1];
-        sv3[0] = 1.60217662e-19 * w0 * sp[3];
+        sv3[0] = 1.60217e-19 * w0 * sp[3];
         const double fw0 = sv3[0] * weights3[iq];
         for (int i = 0; i < 3; ++i)
             BF0[i] += fw0 * FE3_C0_Q3[0][iq][i];
+    }
+    std::fill(A, A + 3, 0.0);
+    for (int i = 0; i < 3; ++i)
+        A[i] += BF0[i];
+  }
+
+};
+
+
+class poisson_exterior_facet_integral_1_otherwise: public ufc::exterior_facet_integral
+{
+public:
+
+  poisson_exterior_facet_integral_1_otherwise() : ufc::exterior_facet_integral()
+  {
+
+  }
+
+  ~poisson_exterior_facet_integral_1_otherwise() override
+  {
+
+  }
+
+  const std::vector<bool> & enabled_coefficients() const final override
+  {
+static const std::vector<bool> enabled({false, true});
+return enabled;
+  }
+
+  void tabulate_tensor(double * A,
+                       const double * const * w,
+                       const double * coordinate_dofs,
+                       std::size_t facet,
+                       int cell_orientation) const final override
+  {
+    // This function was generated using 'uflacs' representation
+    // with the following integrals metadata:
+    // 
+    // num_cells:         None
+    // optimize:          True
+    // precision:         16
+    // quadrature_degree: 2
+    // quadrature_rule:   'default'
+    // representation:    'uflacs'
+    // 
+    // and the following integral 0 metadata:
+    // 
+    // estimated_polynomial_degree: 2
+    // optimize:                    True
+    // precision:                   16
+    // quadrature_degree:           2
+    // quadrature_rule:             'default'
+    // representation:              'uflacs'
+    // Quadrature rules
+    alignas(32) static const double weights2[2] = { 0.5, 0.5 };
+    // Precomputed values of basis functions and precomputations
+    // FE* dimensions: [entities][points][dofs]
+    // PI* dimensions: [entities][dofs][dofs] or [entities][dofs]
+    // PM* dimensions: [entities][dofs][dofs]
+    alignas(32) static const double FE3_C0_D01_F_Q2[1][1][2] = { { { -1.0, 1.0 } } };
+    alignas(32) static const double FE3_C0_F_Q2[3][2][3] =
+        { { { 0.0, 0.7886751345948129, 0.2113248654051871 },
+            { 0.0, 0.2113248654051872, 0.7886751345948129 } },
+          { { 0.7886751345948129, 0.0, 0.2113248654051871 },
+            { 0.2113248654051872, 0.0, 0.7886751345948129 } },
+          { { 0.7886751345948129, 0.2113248654051871, 0.0 },
+            { 0.2113248654051871, 0.7886751345948129, 0.0 } } };
+    // Unstructured piecewise computations
+    const double J_c0 = coordinate_dofs[0] * FE3_C0_D01_F_Q2[0][0][0] + coordinate_dofs[2] * FE3_C0_D01_F_Q2[0][0][1];
+    const double J_c1 = coordinate_dofs[0] * FE3_C0_D01_F_Q2[0][0][0] + coordinate_dofs[4] * FE3_C0_D01_F_Q2[0][0][1];
+    const double J_c2 = coordinate_dofs[1] * FE3_C0_D01_F_Q2[0][0][0] + coordinate_dofs[3] * FE3_C0_D01_F_Q2[0][0][1];
+    const double J_c3 = coordinate_dofs[1] * FE3_C0_D01_F_Q2[0][0][0] + coordinate_dofs[5] * FE3_C0_D01_F_Q2[0][0][1];
+    alignas(32) double sp[10];
+    sp[0] = J_c0 * triangle_reference_facet_jacobian[facet][0][0];
+    sp[1] = J_c1 * triangle_reference_facet_jacobian[facet][1][0];
+    sp[2] = sp[0] + sp[1];
+    sp[3] = sp[2] * sp[2];
+    sp[4] = triangle_reference_facet_jacobian[facet][0][0] * J_c2;
+    sp[5] = triangle_reference_facet_jacobian[facet][1][0] * J_c3;
+    sp[6] = sp[4] + sp[5];
+    sp[7] = sp[6] * sp[6];
+    sp[8] = sp[3] + sp[7];
+    sp[9] = std::sqrt(sp[8]);
+    alignas(32) double BF0[3] = {};
+    for (int iq = 0; iq < 2; ++iq)
+    {
+        // Quadrature loop body setup (num_points=2)
+        // Unstructured varying computations for num_points=2
+        double w1 = 0.0;
+        for (int ic = 0; ic < 3; ++ic)
+            w1 += w[1][ic] * FE3_C0_F_Q2[facet][iq][ic];
+        alignas(32) double sv2[1];
+        sv2[0] = 90 * w1 * sp[9];
+        const double fw0 = sv2[0] * weights2[iq];
+        for (int i = 0; i < 3; ++i)
+            BF0[i] += fw0 * FE3_C0_F_Q2[facet][iq][i];
     }
     std::fill(A, A + 3, 0.0);
     for (int i = 0; i < 3; ++i)
@@ -2819,7 +2915,7 @@ public:
 
   const char * signature() const final override
   {
-    return "ca9e769829da10586276dc8215b89d031b1cb9f17871781a48837ba142fbdfb42fbfe390c4b6f692389447e6f71f868bba1d29b84223cbe14805b6111dfbe504";
+    return "2f3f81f4efd744b74cc10db0c9ef42c1b8e7b8b3f0988e8196c867a52add5a981013a0beab1752ebb9fe52b6a9fb468027dacf9f849a7640c9fcebace1139cf1";
   }
 
   std::size_t rank() const final override
@@ -3058,7 +3154,7 @@ public:
 
   const char * signature() const final override
   {
-    return "b619082a370ea997229330132b5ec734c758622c3d2103c39ffbc2e50907d512d2fddbd4ba5cb238b67643ec8daff820a7684d35c69d6a1af9c07617b78620b4";
+    return "fc16ca458887ad441b04393d34a1b3d84fc89d835b2d91b51c1d410636e4708988b29b7f199891a50ac2a2e296928fdc0ac05dd05382fafc0071cd113565bdd0";
   }
 
   std::size_t rank() const final override
@@ -3068,16 +3164,16 @@ public:
 
   std::size_t num_coefficients() const final override
   {
-    return 1;
+    return 2;
   }
 
   std::size_t original_coefficient_position(std::size_t i) const final override
   {
-    if (i >= 1)
+    if (i >= 2)
     {
         throw std::runtime_error("Invalid original coefficient index.");
     }
-    static const std::vector<std::size_t> position = {0};
+    static const std::vector<std::size_t> position = {0, 1};
     return position[i];
   }
 
@@ -3104,6 +3200,8 @@ public:
         return new poisson_finite_element_0();
     case 1:
         return new poisson_finite_element_0();
+    case 2:
+        return new poisson_finite_element_0();
     default:
         return nullptr;
     }
@@ -3116,6 +3214,8 @@ public:
     case 0:
         return new poisson_dofmap_0();
     case 1:
+        return new poisson_dofmap_0();
+    case 2:
         return new poisson_dofmap_0();
     default:
         return nullptr;
@@ -3169,7 +3269,7 @@ public:
 
   bool has_exterior_facet_integrals() const final override
   {
-    return false;
+    return true;
   }
 
   bool has_interior_facet_integrals() const final override
@@ -3249,7 +3349,7 @@ public:
 
   ufc::exterior_facet_integral * create_default_exterior_facet_integral() const final override
   {
-    return nullptr;
+    return new poisson_exterior_facet_integral_1_otherwise();
   }
 
   ufc::interior_facet_integral * create_default_interior_facet_integral() const final override
@@ -3324,6 +3424,30 @@ public:
 
   // Constructor for constrained function space
   CoefficientSpace_f(std::shared_ptr<const dolfin::Mesh> mesh, std::shared_ptr<const dolfin::SubDomain> constrained_domain):
+    dolfin::FunctionSpace(mesh,
+                          std::make_shared<const dolfin::FiniteElement>(std::make_shared<poisson_finite_element_0>()),
+                          std::make_shared<const dolfin::DofMap>(std::make_shared<poisson_dofmap_0>(), *mesh, constrained_domain))
+  {
+    // Do nothing
+  }
+
+};
+
+class CoefficientSpace_g: public dolfin::FunctionSpace
+{
+public:
+
+  // Constructor for standard function space
+  CoefficientSpace_g(std::shared_ptr<const dolfin::Mesh> mesh):
+    dolfin::FunctionSpace(mesh,
+                          std::make_shared<const dolfin::FiniteElement>(std::make_shared<poisson_finite_element_0>()),
+                          std::make_shared<const dolfin::DofMap>(std::make_shared<poisson_dofmap_0>(), *mesh))
+  {
+    // Do nothing
+  }
+
+  // Constructor for constrained function space
+  CoefficientSpace_g(std::shared_ptr<const dolfin::Mesh> mesh, std::shared_ptr<const dolfin::SubDomain> constrained_domain):
     dolfin::FunctionSpace(mesh,
                           std::make_shared<const dolfin::FiniteElement>(std::make_shared<poisson_finite_element_0>()),
                           std::make_shared<const dolfin::DofMap>(std::make_shared<poisson_dofmap_0>(), *mesh, constrained_domain))
@@ -3570,13 +3694,15 @@ public:
 
 typedef CoefficientSpace_f Form_L_FunctionSpace_1;
 
+typedef CoefficientSpace_g Form_L_FunctionSpace_2;
+
 class Form_L: public dolfin::Form
 {
 public:
 
   // Constructor
   Form_L(std::shared_ptr<const dolfin::FunctionSpace> V0):
-    dolfin::Form(1, 1), f(*this, 0)
+    dolfin::Form(1, 2), f(*this, 0), g(*this, 1)
   {
     _function_spaces[0] = V0;
 
@@ -3584,12 +3710,13 @@ public:
   }
 
   // Constructor
-  Form_L(std::shared_ptr<const dolfin::FunctionSpace> V0, std::shared_ptr<const dolfin::GenericFunction> f):
-    dolfin::Form(1, 1), f(*this, 0)
+  Form_L(std::shared_ptr<const dolfin::FunctionSpace> V0, std::shared_ptr<const dolfin::GenericFunction> f, std::shared_ptr<const dolfin::GenericFunction> g):
+    dolfin::Form(1, 2), f(*this, 0), g(*this, 1)
   {
     _function_spaces[0] = V0;
 
     this->f = f;
+    this->g = g;
 
     _ufc_form = std::make_shared<const poisson_form_1>();
   }
@@ -3603,6 +3730,8 @@ public:
   {
     if (name == "f")
       return 0;
+    else if (name == "g")
+      return 1;
 
     dolfin::dolfin_error("generated code for class Form",
                          "access coefficient data",
@@ -3617,6 +3746,8 @@ public:
     {
     case 0:
       return "f";
+    case 1:
+      return "g";
     }
 
     dolfin::dolfin_error("generated code for class Form",
@@ -3629,9 +3760,11 @@ public:
   typedef Form_L_FunctionSpace_0 TestSpace;
   typedef Form_L_MultiMeshFunctionSpace_0 MultiMeshTestSpace;
   typedef Form_L_FunctionSpace_1 CoefficientSpace_f;
+  typedef Form_L_FunctionSpace_2 CoefficientSpace_g;
 
   // Coefficients
   dolfin::CoefficientAssigner f;
+  dolfin::CoefficientAssigner g;
 };
 
 class MultiMeshForm_L: public dolfin::MultiMeshForm
@@ -3640,7 +3773,7 @@ public:
 
   // Constructor
   MultiMeshForm_L(std::shared_ptr<const dolfin::MultiMeshFunctionSpace> V0):
-    dolfin::MultiMeshForm(V0), f(*this, 0)
+    dolfin::MultiMeshForm(V0), f(*this, 0), g(*this, 1)
   {
     // Create and add standard forms
     std::size_t num_parts = V0->num_parts(); // assume all equal and pick first
@@ -3658,8 +3791,8 @@ public:
   }
 
   // Constructor
-  MultiMeshForm_L(std::shared_ptr<const dolfin::MultiMeshFunctionSpace> V0, std::shared_ptr<const dolfin::GenericFunction> f):
-    dolfin::MultiMeshForm(V0), f(*this, 0)
+  MultiMeshForm_L(std::shared_ptr<const dolfin::MultiMeshFunctionSpace> V0, std::shared_ptr<const dolfin::GenericFunction> f, std::shared_ptr<const dolfin::GenericFunction> g):
+    dolfin::MultiMeshForm(V0), f(*this, 0), g(*this, 1)
   {
     // Create and add standard forms
     std::size_t num_parts = V0->num_parts(); // assume all equal and pick first
@@ -3674,6 +3807,7 @@ public:
 
     /// Assign coefficients
     this->f = f;
+    this->g = g;
 
   }
 
@@ -3686,6 +3820,8 @@ public:
   {
     if (name == "f")
       return 0;
+    else if (name == "g")
+      return 1;
 
     dolfin::dolfin_error("generated code for class Form",
                          "access coefficient data",
@@ -3700,6 +3836,8 @@ public:
     {
     case 0:
       return "f";
+    case 1:
+      return "g";
     }
 
     dolfin::dolfin_error("generated code for class Form",
@@ -3712,9 +3850,11 @@ public:
   typedef Form_L_FunctionSpace_0 TestSpace;
   typedef Form_L_MultiMeshFunctionSpace_0 MultiMeshTestSpace;
   typedef Form_L_FunctionSpace_1 CoefficientSpace_f;
+  typedef Form_L_FunctionSpace_2 CoefficientSpace_g;
 
   // Coefficients
   dolfin::MultiMeshCoefficientAssigner f;
+  dolfin::MultiMeshCoefficientAssigner g;
 };
 
 // Class typedefs

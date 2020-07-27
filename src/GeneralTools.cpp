@@ -1,13 +1,42 @@
 #include <dolfin.h>
-#include <boost/mpi.hpp>
 
 using namespace dolfin;
+
+int pHCompute(dolfin::Function func, dolfin::Function &pH, bool Hbased=true) {
+	(pH.vector())->operator=(0);
+
+	PetscInt lsize;
+	VecGetLocalSize(as_type<const dolfin::PETScVector>(func.vector())->vec(), &lsize);
+
+	const PetscScalar* c_i;
+	VecGetArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
+
+	for (PetscInt j = 0; j < lsize; j = j + 1) {
+		if (Hbased) {
+			if (PetscIsNormalReal(-1*std::log10(1e-3*c_i[j])))
+				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, -1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
+		}
+		else {
+			if (PetscIsNormalReal(14+1*std::log10(1e-3*c_i[j])))
+				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, 14+1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
+		}
+	}
+
+	VecRestoreArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
+	VecAssemblyBegin(as_type<const dolfin::PETScVector>(pH.vector())->vec());
+	VecAssemblyEnd(as_type<const dolfin::PETScVector>(pH.vector())->vec());
+
+	return 0;
+}
 
 int funcRemoveNeg(dolfin::Function &func) {
 	Vec vtmp;
 	VecDuplicate(as_type<const dolfin::PETScVector>(func.vector())->vec(), &vtmp);
 	VecSet(vtmp, 0);
 	VecPointwiseMax(as_type<const dolfin::PETScVector>(func.vector())->vec(), as_type<const dolfin::PETScVector>(func.vector())->vec(), vtmp);// negative concentrations set to zero
+
+	PetscBarrier(NULL);
+
 	VecDestroy(&vtmp);
 	return 0;
 }
@@ -116,15 +145,12 @@ int Vector_of_ConstFunctionGenerator(std::shared_ptr<dolfin::FunctionSpace> Vh, 
 }
 
 int FixNaNValues(Mat &A) {
-	Mat D;
-	MatDuplicate(A, MAT_DO_NOT_COPY_VALUES, &D);
+	PetscInt A_FromRow;
+	PetscInt A_ToRow;
 
-	PetscInt r_startA;
-	PetscInt r_endA;
+	MatGetOwnershipRange(A, &A_FromRow, &A_ToRow);
 
-	MatGetOwnershipRange(A, &r_startA, &r_endA);
-
-	for (PetscInt i = r_startA; i < r_endA; i = i + 1) {
+	for (PetscInt i = A_FromRow; i < A_ToRow; i = i + 1) {
 
 		const PetscScalar* a_i;
 		const PetscInt* colsA;
@@ -136,50 +162,106 @@ int FixNaNValues(Mat &A) {
 		MatGetRow(A, i, &ncolsA, &colsA, &a_i);
 
 		for (PetscInt j=0; j < ncolsA; j = j + 1) {
-			if (PetscIsNanReal(a_i[j])) {
+			if (!PetscIsNormalReal(a_i[j])) {
 				z_ind.push_back(colsA[j]);
 				z_i.push_back(0);
 			}
 		}
-		MatSetValues(D, 1, &i, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
+		MatSetValues(A, 1, &i, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
 		MatRestoreRow(A, i, &ncolsA, &colsA, &a_i);
 	}
-	MatAssemblyBegin(D,MAT_FINAL_ASSEMBLY);
-	MatAssemblyEnd(D,MAT_FINAL_ASSEMBLY);
-
-	MatCopy(D, A, SAME_NONZERO_PATTERN);
-
-	MatDestroy(&D);
+	MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
 
 	return 0;
 }
 
 int FixNaNValues(Vec &b) {
-	const PetscScalar* b_i;
-	VecGetArrayRead(b, &b_i);
-
 	PetscInt lsize;
-
 	VecGetLocalSize(b, &lsize);
 
 	std::vector<PetscScalar> z_i;
 	std::vector<PetscInt> z_ind;
-	for (PetscInt i = 0; i < lsize; i = i + 1) {
-		if (PetscIsNanReal(b_i[i])) {
-			z_ind.push_back(i);
+
+	const PetscScalar* b_i;
+	VecGetArrayRead(b, &b_i);
+
+	for (PetscInt j = 0; j < lsize; j = j + 1) {
+		if (!PetscIsNormalReal(b_i[j])) {
+			z_ind.push_back(j);
 			z_i.push_back(0);
 		}
 	}
 
 	VecSetValuesLocal(b, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
-
+	VecRestoreArrayRead(b, &b_i);
 	VecAssemblyBegin(b);
 	VecAssemblyEnd(b);
 
-	VecRestoreArrayRead(b, &b_i);
+	return 0;
+}
+
+int Trunc2Precision(dolfin::PETScMatrix &A, PetscScalar trc) {
+	trc = std::abs(trc);
+
+	PetscInt A_FromRow;
+	PetscInt A_ToRow;
+
+	MatGetOwnershipRange(A.mat(), &A_FromRow, &A_ToRow);
+
+	for (PetscInt i = A_FromRow; i < A_ToRow; i = i + 1) {
+
+		const PetscScalar* a_i;
+		const PetscInt* colsA;
+		PetscInt ncolsA;
+
+		std::vector<PetscScalar> z_i;
+		std::vector<PetscInt> z_ind;
+
+		MatGetRow(A.mat(), i, &ncolsA, &colsA, &a_i);
+
+		for (PetscInt j=0; j < ncolsA; j = j + 1) {
+			if ((std::abs(a_i[j])<trc && a_i[j]!=0) || (!PetscIsNormalReal(a_i[j]) && a_i[j]!=0)) {
+				z_ind.push_back(colsA[j]);
+				z_i.push_back(0);
+			}
+		}
+		MatSetValues(A.mat(), 1, &i, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
+		MatRestoreRow(A.mat(), i, &ncolsA, &colsA, &a_i);
+	}
+	MatAssemblyBegin(A.mat(), MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(A.mat(), MAT_FINAL_ASSEMBLY);
 
 	return 0;
 }
+
+int Trunc2Precision(dolfin::PETScVector &b, PetscScalar trc) {
+	trc = std::abs(trc);
+
+	PetscInt lsize;
+	VecGetLocalSize(b.vec(), &lsize);
+
+	std::vector<PetscScalar> z_i;
+	std::vector<PetscInt> z_ind;
+
+	const PetscScalar* b_i;
+	VecGetArrayRead(b.vec(), &b_i);
+
+	for (PetscInt j = 0; j < lsize; j = j + 1) {
+		if ((std::abs(b_i[j])<trc && b_i[j]!=0) || (!PetscIsNormalReal(b_i[j]) && b_i[j]!=0)) {
+			z_ind.push_back(j);
+			z_i.push_back(0);
+		}
+	}
+
+	VecSetValuesLocal(b.vec(), z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
+	VecRestoreArrayRead(b.vec(), &b_i);
+	VecAssemblyBegin(b.vec());
+	VecAssemblyEnd(b.vec());
+
+	return 0;
+}
+
 
 int myLinearSystemAssembler(dolfin::Form a, dolfin::Form L, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScMatrix &A, dolfin::PETScVector &b) {
 	if (!(A.empty()))
@@ -187,7 +269,9 @@ int myLinearSystemAssembler(dolfin::Form a, dolfin::Form L, std::vector<dolfin::
 	if (!(b.empty()))
 		b.zero();
 	dolfin::assemble(A, a);
+	Trunc2Precision(A, 1e-23);
 	dolfin::assemble(b, L);
+	Trunc2Precision(b, 1e-23);
 	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
 		DBCs[i].apply(A, b);
 	}
@@ -198,6 +282,7 @@ int myLinearSystemAssembler(dolfin::Form a, std::vector<dolfin::DirichletBC> DBC
 	if (!(A.empty()))
 		A.zero();
 	dolfin::assemble(A, a);
+	Trunc2Precision(A, 1e-23);
 	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
 		DBCs[i].apply(A);
 	}
@@ -208,6 +293,7 @@ int myLinearSystemAssembler(dolfin::Form L, std::vector<dolfin::DirichletBC> DBC
 	if (!(b.empty()))
 		b.zero();
 	dolfin::assemble(b, L);
+	Trunc2Precision(b, 1e-23);
 	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
 		DBCs[i].apply(b);
 	}
