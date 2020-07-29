@@ -118,7 +118,6 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 		eps = epsODE(t, eps0, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
 		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*t + l0;
 		teta = tetaODE(t, teta0, l, eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
-//if((1 - teta + eps*teta)>0.9||(1 - teta + eps*teta)<0.5){std::cout<<"iMg_reduced issue: "<<"teta = "<<teta<<", eps = "<<eps<<", l_dep = "<<l<<std::endl;std::cin>>iElectrode;}
 		iElectrode = iElectrodeFormula(teta, eps);
 		VecSetValueLocal(Ii, LocalDOFSet_bar[j], iElectrode, INSERT_VALUES);
 		//extracting dirichlet condition for electric field
@@ -245,6 +244,46 @@ int PolarizationDataAssign(std::vector<double> &Phi, std::vector<double> &iMg, s
 		iAl.push_back(val);
 	Myinputfile.close();
 	Myinputfile.clear();
+
+	return 0;
+}
+
+int kappa_Compute(std::vector<int> zi, std::vector<double> Di, std::vector<dolfin::Function> ci, dolfin::Function &kappa) {
+
+	kappa = ci[0];
+	(kappa.vector())->operator*=(zi[0]*zi[0]*Di[0]);
+	for (std::size_t i=1; i< zi.size(); i=i+1) {
+		(kappa.vector())->operator+=(*((ci[i].vector())->operator*(zi[i]*zi[i]*Di[i])));
+	}
+	(kappa.vector())->operator*=(39.3179);
+
+	return 0;
+}
+
+int pH_Compute(dolfin::Function func, dolfin::Function &pH, bool Hbased=true) {
+
+	(pH.vector())->operator=(0);
+
+	PetscInt lsize;
+	VecGetLocalSize(as_type<const dolfin::PETScVector>(func.vector())->vec(), &lsize);
+
+	const PetscScalar* c_i;
+	VecGetArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
+
+	for (PetscInt j = 0; j < lsize; j = j + 1) {
+		if (Hbased) {
+			if (PetscIsNormalReal(-1*std::log10(1e-3*c_i[j])))
+				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, -1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
+		}
+		else {
+			if (PetscIsNormalReal(14+1*std::log10(1e-3*c_i[j])))
+				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, 14+1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
+		}
+	}
+
+	VecRestoreArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
+	VecAssemblyBegin(as_type<const dolfin::PETScVector>(pH.vector())->vec());
+	VecAssemblyEnd(as_type<const dolfin::PETScVector>(pH.vector())->vec());
 
 	return 0;
 }

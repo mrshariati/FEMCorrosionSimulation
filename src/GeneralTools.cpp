@@ -2,33 +2,6 @@
 
 using namespace dolfin;
 
-int pHCompute(dolfin::Function func, dolfin::Function &pH, bool Hbased=true) {
-	(pH.vector())->operator=(0);
-
-	PetscInt lsize;
-	VecGetLocalSize(as_type<const dolfin::PETScVector>(func.vector())->vec(), &lsize);
-
-	const PetscScalar* c_i;
-	VecGetArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
-
-	for (PetscInt j = 0; j < lsize; j = j + 1) {
-		if (Hbased) {
-			if (PetscIsNormalReal(-1*std::log10(1e-3*c_i[j])))
-				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, -1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
-		}
-		else {
-			if (PetscIsNormalReal(14+1*std::log10(1e-3*c_i[j])))
-				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, 14+1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
-		}
-	}
-
-	VecRestoreArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
-	VecAssemblyBegin(as_type<const dolfin::PETScVector>(pH.vector())->vec());
-	VecAssemblyEnd(as_type<const dolfin::PETScVector>(pH.vector())->vec());
-
-	return 0;
-}
-
 int funcRemoveNeg(dolfin::Function &func) {
 	Vec vtmp;
 	VecDuplicate(as_type<const dolfin::PETScVector>(func.vector())->vec(), &vtmp);

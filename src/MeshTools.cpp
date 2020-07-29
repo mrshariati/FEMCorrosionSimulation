@@ -424,16 +424,6 @@ int BoxPointsGenerator(double width, double length, double height, std::vector<d
 	return 0;
 }
 
-//to apply different boundaries we need to mark each of boundaries that is defined with Subdomain
-int BoundaryMarking(std::vector<std::shared_ptr<dolfin::SubDomain>> &bcs, std::vector<std::size_t> bcs_indc, std::shared_ptr<dolfin::Mesh> mesh, bool Midcheck=true) {
-
-	for (std::size_t i = 0; i < bcs.size(); i = i + 1) {
-		bcs[i]->mark(*mesh, mesh->topology().dim() - 1, bcs_indc[i], Midcheck);
-	}
-
-	return 0;
-}
-
 //to convert a mesh from xdmf to xml
 int Mesh_XDMF2XML(std::string XDMFFileName="mesh.xdmf", std::string XMLFileName="mesh.xml") {
 

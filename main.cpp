@@ -61,11 +61,12 @@ int main(int argc,char ** args) {
 
 	PetscBarrier(NULL);
 
-	//----Creating the functions that we apply to variational formulations in the corrosion model----
+	//----Creating the functions that we apply to variational formulations model----
 	auto zerofunc = std::make_shared<dolfin::Function>(Vh);
-	zerofunc->interpolate(dolfin::Constant(0));
+	(zerofunc->vector())->operator=(0);
 
 	//Electrical field
+	auto kappa = std::make_shared<dolfin::Function>(Vh);
 	std::vector<std::shared_ptr<dolfin::Function>> EFfuncs;
 	std::vector<bool> isconst = {0};
 	Vector_of_NonConstFunctionGenerator(Vh, EFfuncs, isconst, {});
@@ -92,7 +93,6 @@ int main(int argc,char ** args) {
 	constvalue.clear(); constvalue.shrink_to_fit();
 	constvalue = {5.27e-9, -1};
 	Vector_of_ConstFunctionGenerator(Vh, OHconsts, constvalue);
-
 
 	//H
 	std::vector<std::shared_ptr<dolfin::Function>> Hfuncs;
@@ -147,8 +147,7 @@ int main(int argc,char ** args) {
 	NodesIndices2LocalDOFs(*Vh, *mesh, NodesOnMgElectrode, DOFsSetOnMgElectrode);
 
 	PetscBarrier(NULL);
-//std::vector<std::size_t> l2g_dofmap;Vh->dofmap()->tabulate_local_to_global_dofs(l2g_dofmap);
-//auto shdof = Vh->dofmap()->shared_nodes();for (auto& i: shdof) for (std::size_t j;j<(i.second).size();j++) std::cout<<"dof: "<<l2g_dofmap[i.first]<<" with prc: "<<(i.second)[j]<<std::endl;
+
 	//--Nodes indices and domain information is no longer needed--
 	NodesOnAlElectrode.clear(); NodesOnAlElectrode.shrink_to_fit();
 	NodesOnMgElectrode.clear(); NodesOnMgElectrode.shrink_to_fit();
@@ -156,7 +155,12 @@ int main(int argc,char ** args) {
 
 	//----Assembling the final linear systems and solve them and storing the solution----
 	//Poisson
-	myFormAssigner(*L, {"f", "g"}, {zerofunc, zerofunc});
+	kappa_Compute({2, -1, 1, 1, -1}, {0.71e-9, 5.27e-9, 9.31e-9, 1.33e-9, 2.03e-9}, {*Mgfuncs[0], *OHfuncs[0], *Hfuncs[0], *Nafuncs[0], *Clfuncs[0]}, *kappa);
+
+	PetscBarrier(NULL);
+
+	myFormAssigner(*a, {"kappa"}, {kappa});
+	myFormAssigner(*L, {"kappa", "f", "g"}, {kappa, zerofunc, zerofunc});
 	auto A_P = std::make_shared<dolfin::PETScMatrix>(PETSC_COMM_WORLD);
 	auto b_P = std::make_shared<dolfin::PETScVector>(PETSC_COMM_WORLD);
 	myLinearSystemAssembler(*a, *L, DBCs, *A_P, *b_P);
@@ -197,7 +201,6 @@ int main(int argc,char ** args) {
 
 	double dt = 1;
 	double t = 0;
-	double alfa = 1e-7/dt;//change of variable
 	double change_norm;
 	std::size_t s = 5;
 	std::size_t totalsteps = 12*3600*1;
@@ -225,11 +228,8 @@ int main(int argc,char ** args) {
 
 	iMg(DOFsSetOnMgElectrode, t, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), 0.55, 0.4, 1e-7, Ii, BoundaryPhi, PhiPolData, MgPolData);//A/m^2
 
-//dolfin::File ff_bh(PETSC_COMM_WORLD, "Results/Ii.pvd");
-//ff_bh<<(*std::make_shared<dolfin::Function>(Vh, (std::make_shared<dolfin::PETScVector>(Ii))->operator*(1)));
-
 	myFormAssigner(*A, {"Di", "zi"}, Mgconsts);
-	myFormAssigner(*A, {"phi", "alpha"}, {EFfuncs[0], std::make_shared<dolfin::Constant>(alfa)});
+	myFormAssigner(*A, {"phi"}, {EFfuncs[0]});
 	myFormAssigner(*f, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, (std::make_shared<dolfin::PETScVector>(Ii))->operator*(-1*5.182045e-6))});//stochimetry coefficient divided by z in equation (3)
 
 	PetscBarrier(NULL);
@@ -278,7 +278,6 @@ int main(int argc,char ** args) {
 	MatCopy(A_ML, b_Mg, SAME_NONZERO_PATTERN);
 	MatAXPY(b_Mg, -0.5*dt, L0_Mg, SAME_NONZERO_PATTERN);
 	MatMult(b_Mg, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), b_NP);
-	VecScale(b_NP, std::exp(alfa*dt));
 	VecAXPY(b_NP, 0.5*dt, b0_Mg->vec());//b0=0
 	VecAXPY(b_NP, 1, fStar);
 
@@ -290,14 +289,14 @@ int main(int argc,char ** args) {
 	KSPSetType(myNPSolver, KSPGMRES);
 	KSPSetInitialGuessNonzero(myNPSolver, PETSC_TRUE);
 	KSPGetPC(myNPSolver, &myNPConditioner);
-	PCSetType(myNPConditioner, PCSOR);
+	PCSetType(myNPConditioner, PCJACOBI);
 	KSPSetUp(myNPSolver);
 
 	auto NPSolver = std::make_shared<dolfin::PETScKrylovSolver>(myNPSolver);
 	NPSolver->set_operator(dolfin::PETScMatrix(A_Mg));
 	NPSolver->solve(*Mgfuncs[1]->vector(), dolfin::PETScVector(b_NP));
 
-	std::string NPSolverMethod = "gmres";
+	std::string NPSolverMethod = "gmres with jacobi";
 
 	auto ff_Mg = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/Mg Concentration.pvd");
 	ff_Mg->operator<<(*Mgfuncs[0]);
@@ -357,7 +356,6 @@ int main(int argc,char ** args) {
 	MatCopy(A_ML, b_OH, SAME_NONZERO_PATTERN);
 	MatAXPY(b_OH, -0.5*dt, L0_OH, SAME_NONZERO_PATTERN);
 	MatMult(b_OH, as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), b_NP);
-	VecScale(b_NP, std::exp(alfa*dt));
 	VecAXPY(b_NP, 0.5*dt, b0_OH->vec());//b0=0
 	VecAXPY(b_NP, 1, fStar);
 
@@ -417,7 +415,6 @@ int main(int argc,char ** args) {
 	MatCopy(A_ML, b_H, SAME_NONZERO_PATTERN);
 	MatAXPY(b_H, -0.5*dt, L0_H, SAME_NONZERO_PATTERN);
 	MatMult(b_H, as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), b_NP);
-	VecScale(b_NP, std::exp(alfa*dt));
 	VecAXPY(b_NP, 0.5*dt, b0_H->vec());//b0=0
 	VecAXPY(b_NP, 1, fStar);
 
@@ -440,7 +437,6 @@ int main(int argc,char ** args) {
 	auto b1_Na = std::make_shared<dolfin::PETScVector>(PETSC_COMM_WORLD);
 
 	myFormAssigner(*A, {"Di", "zi"}, Naconsts);
-	myFormAssigner(*A, {"alpha"}, {zerofunc});
 	myFormAssigner(*f, {"Ii"}, {zerofunc});
 
 	PetscBarrier(NULL);
@@ -558,7 +554,7 @@ int main(int argc,char ** args) {
 
 	//pH
 	auto pH = std::make_shared<dolfin::Function>(Vh);
-	pHCompute(*OHfuncs[0], *pH, false);
+	pH_Compute(*OHfuncs[0], *pH, false);
 	auto ff_pH = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/pH.pvd");
 	ff_pH->operator<<(*pH);
 
@@ -571,7 +567,7 @@ int main(int argc,char ** args) {
 
 	//poisson
 	auto sumfunc = std::make_shared<dolfin::Function>(Vh);
-	sumfunc->interpolate(dolfin::Constant(0));
+	(zerofunc->vector())->operator=(0);
 	funcsLinSum({2, 1, -1, 1, -1}, {*Mgfuncs[1], *Nafuncs[1], *Clfuncs[1], *Hfuncs[1], *OHfuncs[1]}, *sumfunc);
 	DBCs[0].set_value(std::make_shared<dolfin::Function>(Vh, std::make_shared<dolfin::PETScVector>(BoundaryPhi)));
 	DBCs[1].set_value(std::make_shared<dolfin::Function>(Vh, std::make_shared<dolfin::PETScVector>(BoundaryPhi)));
@@ -583,9 +579,15 @@ int main(int argc,char ** args) {
 	*(Nafuncs[0]->vector()) = *(Nafuncs[1]->vector());
 	*(Clfuncs[0]->vector()) = *(Clfuncs[1]->vector());
 std::cout<<"norm MgVec: "<<change_norm<<std::endl;
-	while (change_norm>1e+4) {
+change_norm=1e-7;
+	while (change_norm>1e-6) {
 		//Poisson
-		myFormAssigner(*L, {"f"}, {sumfunc});
+		kappa_Compute({2, -1, 1, 1, -1}, {0.71e-9, 5.27e-9, 9.31e-9, 1.33e-9, 2.03e-9}, {*Mgfuncs[0], *OHfuncs[0], *Hfuncs[0], *Nafuncs[0], *Clfuncs[0]}, *kappa);
+
+		PetscBarrier(NULL);
+
+		myFormAssigner(*a, {"kappa"}, {kappa});
+		myFormAssigner(*L, {"kappa", "f"}, {kappa, sumfunc});
 		myLinearSystemAssembler(*L, DBCs, *b_P);
 
 		PetscBarrier(NULL);
@@ -594,7 +596,7 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 
 		//Mg
 		myFormAssigner(*A, {"Di", "zi"}, Mgconsts);
-		myFormAssigner(*A, {"phi", "alpha"}, {EFfuncs[0], std::make_shared<dolfin::Constant>(alfa)});
+		myFormAssigner(*A, {"phi"}, {EFfuncs[0]});
 		myFormAssigner(*f, {"Ii"}, {zerofunc});
 
 		PetscBarrier(NULL);
@@ -617,8 +619,7 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 		MatCopy(A_ML, b_Mg, SAME_NONZERO_PATTERN);
 		MatAXPY(b_Mg, -0.5*dt, L0_Mg, SAME_NONZERO_PATTERN);
 		MatMult(b_Mg, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), b_NP);
-		VecScale(b_NP, std::exp(alfa*dt));
-		VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_Mg->vec());
+		VecAXPY(b_NP, 0.5*dt, b0_Mg->vec());
 		VecAXPY(b_NP, 0.5*dt, b1_Mg->vec());
 		VecAXPY(b_NP, 1, fStar);
 
@@ -650,8 +651,7 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 		MatCopy(A_ML, b_OH, SAME_NONZERO_PATTERN);
 		MatAXPY(b_OH, -0.5*dt, L0_OH, SAME_NONZERO_PATTERN);
 		MatMult(b_OH, as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), b_NP);
-		VecScale(b_NP, std::exp(alfa*dt));
-		VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_OH->vec());
+		VecAXPY(b_NP, 0.5*dt, b0_OH->vec());
 		VecAXPY(b_NP, 0.5*dt, b1_OH->vec());
 		VecAXPY(b_NP, 1, fStar);
 
@@ -683,8 +683,7 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 		MatCopy(A_ML, b_H, SAME_NONZERO_PATTERN);
 		MatAXPY(b_H, -0.5*dt, L0_H, SAME_NONZERO_PATTERN);
 		MatMult(b_H, as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), b_NP);
-		VecScale(b_NP, std::exp(alfa*dt));
-		VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_H->vec());
+		VecAXPY(b_NP, 0.5*dt, b0_H->vec());
 		VecAXPY(b_NP, 0.5*dt, b1_H->vec());
 		VecAXPY(b_NP, 1, fStar);
 
@@ -695,7 +694,6 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 
 		//Na
 		myFormAssigner(*A, {"Di", "zi"}, Naconsts);
-		myFormAssigner(*A, {"alpha"}, {zerofunc});
 
 		PetscBarrier(NULL);
 
@@ -766,7 +764,7 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 		VecCopy(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), change);
 		VecAXPY(change, -1, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec());
 		VecNorm(change, NORM_INFINITY, &change_norm);
-std::cout<<"breakpoint "<<change_norm<<std::endl;
+
 		//poisson
 		funcsLinSum({2, 1, -1, 1, -1}, {*Mgfuncs[1], *Nafuncs[1], *Clfuncs[1], *Hfuncs[1], *OHfuncs[1]}, *sumfunc);
 		DBCs[0].set_value(std::make_shared<dolfin::Function>(Vh, std::make_shared<dolfin::PETScVector>(BoundaryPhi)));
@@ -874,7 +872,7 @@ std::cout<<"breakpoint "<<change_norm<<std::endl;
 	ff_Cl->operator<<(*Clfuncs[1]);
 
 	//pH
-	pHCompute(*OHfuncs[1], *pH, false);
+	pH_Compute(*OHfuncs[1], *pH, false);
 	ff_pH->operator<<(*pH);
 
 	//time
@@ -884,7 +882,12 @@ std::cin>>change_norm;
 	for (std::size_t i=1; i<=totalsteps; i = i + 1) {//totalsteps
 
 		//Poisson
-		myFormAssigner(*L, {"f"}, {sumfunc});
+		kappa_Compute({2, -1, 1, 1, -1}, {0.71e-9, 5.27e-9, 9.31e-9, 1.33e-9, 2.03e-9}, {*Mgfuncs[0], *OHfuncs[0], *Hfuncs[0], *Nafuncs[0], *Clfuncs[0]}, *kappa);
+
+		PetscBarrier(NULL);
+
+		myFormAssigner(*a, {"kappa"}, {kappa});
+		myFormAssigner(*L, {"kappa", "f"}, {kappa, sumfunc});
 		myLinearSystemAssembler(*L, DBCs, *b_P);
 
 		PetscBarrier(NULL);
@@ -895,7 +898,7 @@ std::cin>>change_norm;
 		iMg(DOFsSetOnMgElectrode, t, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), 0.55, 0.4, 1e-7, Ii, BoundaryPhi, PhiPolData, MgPolData);//A/m^2
 
 		myFormAssigner(*A, {"Di", "zi"}, Mgconsts);
-		myFormAssigner(*A, {"phi", "alpha"}, {EFfuncs[0], std::make_shared<dolfin::Constant>(alfa)});
+		myFormAssigner(*A, {"phi"}, {EFfuncs[0]});
 		myFormAssigner(*f, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, (std::make_shared<dolfin::PETScVector>(Ii))->operator*(-1*5.182045e-6))});
 
 		PetscBarrier(NULL);
@@ -918,8 +921,7 @@ std::cin>>change_norm;
 		MatCopy(A_ML, b_Mg, SAME_NONZERO_PATTERN);
 		MatAXPY(b_Mg, -0.5*dt, L0_Mg, SAME_NONZERO_PATTERN);
 		MatMult(b_Mg, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), b_NP);
-		VecScale(b_NP, std::exp(alfa*dt));
-		VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_Mg->vec());
+		VecAXPY(b_NP, 0.5*dt, b0_Mg->vec());
 		VecAXPY(b_NP, 0.5*dt, b1_Mg->vec());
 		VecAXPY(b_NP, 1, fStar);
 
@@ -954,8 +956,7 @@ std::cin>>change_norm;
 		MatCopy(A_ML, b_OH, SAME_NONZERO_PATTERN);
 		MatAXPY(b_OH, -0.5*dt, L0_OH, SAME_NONZERO_PATTERN);
 		MatMult(b_OH, as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), b_NP);
-		VecScale(b_NP, std::exp(alfa*dt));
-		VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_OH->vec());
+		VecAXPY(b_NP, 0.5*dt, b0_OH->vec());
 		VecAXPY(b_NP, 0.5*dt, b1_OH->vec());
 		VecAXPY(b_NP, 1, fStar);
 
@@ -987,8 +988,7 @@ std::cin>>change_norm;
 		MatCopy(A_ML, b_H, SAME_NONZERO_PATTERN);
 		MatAXPY(b_H, -0.5*dt, L0_H, SAME_NONZERO_PATTERN);
 		MatMult(b_H, as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), b_NP);
-		VecScale(b_NP, std::exp(alfa*dt));
-		VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_H->vec());
+		VecAXPY(b_NP, 0.5*dt, b0_H->vec());
 		VecAXPY(b_NP, 0.5*dt, b1_H->vec());
 		VecAXPY(b_NP, 1, fStar);
 
@@ -1005,7 +1005,6 @@ std::cin>>change_norm;
 		if (i%5 == 0) {
 			//Na
 			myFormAssigner(*A, {"Di", "zi"}, Naconsts);
-			myFormAssigner(*A, {"alpha"}, {zerofunc});
 			myFormAssigner(*f, {"Ii"}, {zerofunc});
 
 			PetscBarrier(NULL);
@@ -1111,7 +1110,12 @@ std::cin>>change_norm;
 
 		while (change_norm>1e-6) {
 			//Poisson
-			myFormAssigner(*L, {"f"}, {sumfunc});
+			kappa_Compute({2, -1, 1, 1, -1}, {0.71e-9, 5.27e-9, 9.31e-9, 1.33e-9, 2.03e-9}, {*Mgfuncs[0], *OHfuncs[0], *Hfuncs[0], *Nafuncs[0], *Clfuncs[0]}, *kappa);
+
+			PetscBarrier(NULL);
+
+			myFormAssigner(*a, {"kappa"}, {kappa});
+			myFormAssigner(*L, {"kappa", "f"}, {kappa, sumfunc});
 			myLinearSystemAssembler(*L, DBCs, *b_P);
 
 			PetscBarrier(NULL);
@@ -1120,7 +1124,7 @@ std::cin>>change_norm;
 
 			//Mg
 			myFormAssigner(*A, {"Di", "zi"}, Mgconsts);
-			myFormAssigner(*A, {"phi", "alpha"}, {EFfuncs[0], std::make_shared<dolfin::Constant>(alfa)});
+			myFormAssigner(*A, {"phi"}, {EFfuncs[0]});
 			myFormAssigner(*f, {"Ii"}, {zerofunc});
 
 			PetscBarrier(NULL);
@@ -1143,15 +1147,14 @@ std::cin>>change_norm;
 			MatCopy(A_ML, b_Mg, SAME_NONZERO_PATTERN);
 			MatAXPY(b_Mg, -0.5*dt, L0_Mg, SAME_NONZERO_PATTERN);
 			MatMult(b_Mg, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), b_NP);
-			VecScale(b_NP, std::exp(alfa*dt));
-			VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_Mg->vec());
+			VecAXPY(b_NP, 0.5*dt, b0_Mg->vec());
 			VecAXPY(b_NP, 0.5*dt, b1_Mg->vec());
 			VecAXPY(b_NP, 1, fStar);
 
 			PetscBarrier(NULL);
 
-			KSPSetOperators(myNPSolver, A_Mg, A_Mg);
-			KSPSolve(myNPSolver, b_NP, as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec());
+			NPSolver->set_operator(dolfin::PETScMatrix(A_Mg));
+			NPSolver->solve(*Mgfuncs[1]->vector(), dolfin::PETScVector(b_NP));
 
 			//OH
 			myFormAssigner(*A, {"Di", "zi"}, OHconsts);
@@ -1176,15 +1179,14 @@ std::cin>>change_norm;
 			MatCopy(A_ML, b_OH, SAME_NONZERO_PATTERN);
 			MatAXPY(b_OH, -0.5*dt, L0_OH, SAME_NONZERO_PATTERN);
 			MatMult(b_OH, as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), b_NP);
-			VecScale(b_NP, std::exp(alfa*dt));
-			VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_OH->vec());
+			VecAXPY(b_NP, 0.5*dt, b0_OH->vec());
 			VecAXPY(b_NP, 0.5*dt, b1_OH->vec());
 			VecAXPY(b_NP, 1, fStar);
 
 			PetscBarrier(NULL);
 
-			KSPSetOperators(myNPSolver, A_OH, A_OH);
-			KSPSolve(myNPSolver, b_NP, as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec());
+			NPSolver->set_operator(dolfin::PETScMatrix(A_OH));
+			NPSolver->solve(*OHfuncs[1]->vector(), dolfin::PETScVector(b_NP));
 
 			//H
 			myFormAssigner(*A, {"Di", "zi"}, Hconsts);
@@ -1209,20 +1211,18 @@ std::cin>>change_norm;
 			MatCopy(A_ML, b_H, SAME_NONZERO_PATTERN);
 			MatAXPY(b_H, -0.5*dt, L0_H, SAME_NONZERO_PATTERN);
 			MatMult(b_H, as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), b_NP);
-			VecScale(b_NP, std::exp(alfa*dt));
-			VecAXPY(b_NP, std::exp(alfa*dt)*0.5*dt, b0_H->vec());
+			VecAXPY(b_NP, 0.5*dt, b0_H->vec());
 			VecAXPY(b_NP, 0.5*dt, b1_H->vec());
 			VecAXPY(b_NP, 1, fStar);
 
 			PetscBarrier(NULL);
 
-			KSPSetOperators(myNPSolver, A_H, A_H);
-			KSPSolve(myNPSolver, b_NP, as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec());
+			NPSolver->set_operator(dolfin::PETScMatrix(A_H));
+			NPSolver->solve(*Hfuncs[1]->vector(), dolfin::PETScVector(b_NP));
 
 			if (i%5 == 0) {
 				//Na
 				myFormAssigner(*A, {"Di", "zi"}, Naconsts);
-				myFormAssigner(*A, {"alpha"}, {zerofunc});
 				myFormAssigner(*f, {"Ii"}, {zerofunc});
 
 				PetscBarrier(NULL);
@@ -1251,8 +1251,8 @@ std::cin>>change_norm;
 
 				PetscBarrier(NULL);
 
-				KSPSetOperators(myNPSolver, A_Na, A_Na);
-				KSPSolve(myNPSolver, b_NP, as_type<const dolfin::PETScVector>(Nafuncs[1]->vector())->vec());
+				NPSolver->set_operator(dolfin::PETScMatrix(A_Na));
+				NPSolver->solve(*Nafuncs[1]->vector(), dolfin::PETScVector(b_NP));
 
 				//Cl
 				myFormAssigner(*A, {"Di", "zi"}, Clconsts);
@@ -1283,8 +1283,8 @@ std::cin>>change_norm;
 
 				PetscBarrier(NULL);
 
-				KSPSetOperators(myNPSolver, A_Cl, A_Cl);
-				KSPSolve(myNPSolver, b_NP, as_type<const dolfin::PETScVector>(Clfuncs[1]->vector())->vec());
+				NPSolver->set_operator(dolfin::PETScMatrix(A_Cl));
+				NPSolver->solve(*Clfuncs[1]->vector(), dolfin::PETScVector(b_NP));
 			}
 
 			PetscBarrier(NULL);
@@ -1410,7 +1410,7 @@ std::cin>>change_norm;
 
 		if (i%s == 0) {
 			//pH
-			pHCompute(*OHfuncs[1], *pH, false);
+			pH_Compute(*OHfuncs[1], *pH, false);
 			ff_pH->operator<<(*pH);
 		}
 
@@ -1439,6 +1439,7 @@ std::cin>>change_norm;
 
 	//--Electric field information is no longer needed--
 	DBCs.clear(); DBCs.shrink_to_fit();
+	kappa.reset();
 	A_P.reset();
 	b_P.reset();
 	PSolver.reset();
