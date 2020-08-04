@@ -64,5 +64,7 @@ int main(int argc,char ** args) {
 
 //dolfin::File ff_bh(PETSC_COMM_WORLD, "Results/Ii.pvd");
 //ff_bh<<(*std::make_shared<dolfin::Function>(Vh, (std::make_shared<dolfin::PETScVector>(Ii))->operator*(1)));
+
+//for(std::size_t i=0;i<DOFsSetOnAlElectrode.size();i++)std::cout<<DOFsSetOnAlElectrode[i]<<"Al("<<prcID<<")"<<std::endl;PetscBarrier(NULL);for(std::size_t i=0;i<DOFsSetOnMgElectrode.size();i++)std::cout<<DOFsSetOnMgElectrode[i]<<"Mg("<<prcID<<")"<<std::endl;
 	return 0;
 }

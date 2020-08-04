@@ -211,12 +211,14 @@ int main(int argc,char ** args) {
 
 	//prellocation
 	MatDuplicate(A_MC->mat(), MAT_DO_NOT_COPY_VALUES, &A_ML);
-	MatCreateVecs(A_MC->mat(), NULL, &Ii);
+	VecDuplicate(as_type<const dolfin::PETScVector>(EFfuncs[0]->vector())->vec(), &Ii);
 	VecDuplicate(Ii, &BoundaryPhi);
 	VecDuplicate(Ii, &change);
 	VecSet(Ii, 0);
 	VecSet(BoundaryPhi, 0);
 	VecSet(change, 0);
+
+	PetscBarrier(NULL);
 
 	FEMFCT_ML_Compute(A_MC->mat(), A_ML);
 
@@ -286,7 +288,7 @@ int main(int argc,char ** args) {
 	KSP myNPSolver;
 	PC myNPConditioner;
 	KSPCreate(PETSC_COMM_WORLD, &myNPSolver);
-	KSPSetType(myNPSolver, KSPGMRES);
+	KSPSetType(myNPSolver, KSPDGMRES);
 	KSPSetInitialGuessNonzero(myNPSolver, PETSC_TRUE);
 	KSPGetPC(myNPSolver, &myNPConditioner);
 	PCSetType(myNPConditioner, PCJACOBI);
@@ -579,7 +581,7 @@ int main(int argc,char ** args) {
 	*(Nafuncs[0]->vector()) = *(Nafuncs[1]->vector());
 	*(Clfuncs[0]->vector()) = *(Clfuncs[1]->vector());
 std::cout<<"norm MgVec: "<<change_norm<<std::endl;
-change_norm=1e-7;
+//change_norm=1e-7;
 	while (change_norm>1e-6) {
 		//Poisson
 		kappa_Compute({2, -1, 1, 1, -1}, {0.71e-9, 5.27e-9, 9.31e-9, 1.33e-9, 2.03e-9}, {*Mgfuncs[0], *OHfuncs[0], *Hfuncs[0], *Nafuncs[0], *Clfuncs[0]}, *kappa);
@@ -591,9 +593,10 @@ change_norm=1e-7;
 		myLinearSystemAssembler(*L, DBCs, *b_P);
 
 		PetscBarrier(NULL);
-
+dolfin::File ff_bh(PETSC_COMM_WORLD, "Results/kappa.pvd");
+ff_bh<<(*kappa);
 		PSolver->solve(*EFfuncs[0]->vector(), *b_P);
-
+break;
 		//Mg
 		myFormAssigner(*A, {"Di", "zi"}, Mgconsts);
 		myFormAssigner(*A, {"phi"}, {EFfuncs[0]});
@@ -608,19 +611,13 @@ change_norm=1e-7;
 		FEMFCT_fStar_Compute(A_ML, A_MC->mat(), D1_Mg, D0_Mg, L0_Mg, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), b0_Mg->vec(), dt, rij, fStar);
 
 		MatZeroEntries(A_Mg);
-		MatZeroEntries(b_Mg);
 		VecSet(b_NP, 0);
 
 		PetscBarrier(NULL);
 
-		MatCopy(A_ML, A_Mg, SAME_NONZERO_PATTERN);
-		MatAXPY(A_Mg, 0.5*dt, L1_Mg, SAME_NONZERO_PATTERN);
+		MatCopy(L1_Mg, A_Mg, SAME_NONZERO_PATTERN);
 
-		MatCopy(A_ML, b_Mg, SAME_NONZERO_PATTERN);
-		MatAXPY(b_Mg, -0.5*dt, L0_Mg, SAME_NONZERO_PATTERN);
-		MatMult(b_Mg, as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), b_NP);
-		VecAXPY(b_NP, 0.5*dt, b0_Mg->vec());
-		VecAXPY(b_NP, 0.5*dt, b1_Mg->vec());
+		VecCopy(b1_Mg->vec(), b_NP);
 		VecAXPY(b_NP, 1, fStar);
 
 		PetscBarrier(NULL);
@@ -640,19 +637,13 @@ change_norm=1e-7;
 		FEMFCT_fStar_Compute(A_ML, A_MC->mat(), D1_OH, D0_OH, L0_OH, as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), b0_OH->vec(), dt, rij, fStar);
 
 		MatZeroEntries(A_OH);
-		MatZeroEntries(b_OH);
 		VecSet(b_NP, 0);
 
 		PetscBarrier(NULL);
 
-		MatCopy(A_ML, A_OH, SAME_NONZERO_PATTERN);
-		MatAXPY(A_OH, 0.5*dt, L1_OH, SAME_NONZERO_PATTERN);
+		MatCopy(L1_OH, A_OH, SAME_NONZERO_PATTERN);
 
-		MatCopy(A_ML, b_OH, SAME_NONZERO_PATTERN);
-		MatAXPY(b_OH, -0.5*dt, L0_OH, SAME_NONZERO_PATTERN);
-		MatMult(b_OH, as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), b_NP);
-		VecAXPY(b_NP, 0.5*dt, b0_OH->vec());
-		VecAXPY(b_NP, 0.5*dt, b1_OH->vec());
+		VecCopy(b1_OH->vec(), b_NP);
 		VecAXPY(b_NP, 1, fStar);
 
 		PetscBarrier(NULL);
@@ -672,19 +663,13 @@ change_norm=1e-7;
 		FEMFCT_fStar_Compute(A_ML, A_MC->mat(), D1_H, D0_H, L0_H, as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), b0_H->vec(), dt, rij, fStar);
 
 		MatZeroEntries(A_H);
-		MatZeroEntries(b_H);
 		VecSet(b_NP, 0);
 
 		PetscBarrier(NULL);
 
-		MatCopy(A_ML, A_H, SAME_NONZERO_PATTERN);
-		MatAXPY(A_H, 0.5*dt, L1_H, SAME_NONZERO_PATTERN);
+		MatCopy(L1_H, A_H, SAME_NONZERO_PATTERN);
 
-		MatCopy(A_ML, b_H, SAME_NONZERO_PATTERN);
-		MatAXPY(b_H, -0.5*dt, L0_H, SAME_NONZERO_PATTERN);
-		MatMult(b_H, as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), b_NP);
-		VecAXPY(b_NP, 0.5*dt, b0_H->vec());
-		VecAXPY(b_NP, 0.5*dt, b1_H->vec());
+		VecCopy(b1_H->vec(), b_NP);
 		VecAXPY(b_NP, 1, fStar);
 
 		PetscBarrier(NULL);
@@ -704,19 +689,13 @@ change_norm=1e-7;
 		FEMFCT_fStar_Compute(A_ML, A_MC->mat(), D1_Na, D0_Na, L0_Na, as_type<const dolfin::PETScVector>(Nafuncs[0]->vector())->vec(), b0_Na->vec(), dt, rij, fStar);
 
 		MatZeroEntries(A_Na);
-		MatZeroEntries(b_Na);
 		VecSet(b_NP, 0);
 
 		PetscBarrier(NULL);
 
-		MatCopy(A_ML, A_Na, SAME_NONZERO_PATTERN);
-		MatAXPY(A_Na, 0.5*5*dt, L1_Na, SAME_NONZERO_PATTERN);
+		MatCopy(L1_Na, A_Na, SAME_NONZERO_PATTERN);
 
-		MatCopy(A_ML, b_Na, SAME_NONZERO_PATTERN);
-		MatAXPY(b_Na, -0.5*5*dt, L0_Na, SAME_NONZERO_PATTERN);
-		MatMult(b_Na, as_type<const dolfin::PETScVector>(Nafuncs[0]->vector())->vec(), b_NP);
-		VecAXPY(b_NP, 0.5*5*dt, b0_Na->vec());
-		VecAXPY(b_NP, 0.5*5*dt, b1_Na->vec());
+		VecCopy(b1_Na->vec(), b_NP);
 		VecAXPY(b_NP, 1, fStar);
 
 		PetscBarrier(NULL);
@@ -736,19 +715,13 @@ change_norm=1e-7;
 		FEMFCT_fStar_Compute(A_ML, A_MC->mat(), D1_Cl, D0_Cl, L0_Cl, as_type<const dolfin::PETScVector>(Clfuncs[0]->vector())->vec(), b0_Cl->vec(), dt, rij, fStar);
 
 		MatZeroEntries(A_Cl);
-		MatZeroEntries(b_Cl);
 		VecSet(b_NP, 0);
 
 		PetscBarrier(NULL);
 
-		MatCopy(A_ML, A_Cl, SAME_NONZERO_PATTERN);
-		MatAXPY(A_Cl, 0.5*5*dt, L1_Cl, SAME_NONZERO_PATTERN);
+		MatCopy(L1_Cl, A_Cl, SAME_NONZERO_PATTERN);
 
-		MatCopy(A_ML, b_Cl, SAME_NONZERO_PATTERN);
-		MatAXPY(b_Cl, -0.5*5*dt, L0_Cl, SAME_NONZERO_PATTERN);
-		MatMult(b_Cl, as_type<const dolfin::PETScVector>(Clfuncs[0]->vector())->vec(), b_NP);
-		VecAXPY(b_NP, 0.5*5*dt, b0_Cl->vec());
-		VecAXPY(b_NP, 0.5*5*dt, b1_Cl->vec());
+		VecCopy(b1_Cl->vec(), b_NP);
 		VecAXPY(b_NP, 1, fStar);
 
 		PetscBarrier(NULL);

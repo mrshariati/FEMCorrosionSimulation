@@ -255,7 +255,7 @@ int kappa_Compute(std::vector<int> zi, std::vector<double> Di, std::vector<dolfi
 	for (std::size_t i=1; i< zi.size(); i=i+1) {
 		(kappa.vector())->operator+=(*((ci[i].vector())->operator*(zi[i]*zi[i]*Di[i])));
 	}
-	(kappa.vector())->operator*=(39.3179);
+	(kappa.vector())->operator*=(39.3179);//Multiply by F/RT
 
 	return 0;
 }
