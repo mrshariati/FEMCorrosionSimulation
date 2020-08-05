@@ -27,6 +27,8 @@ int VecSetOnDOFs(std::vector<size_t> DOFsSet, Vec &v, double val) {
 		VecSetValue(v, DOFsSet[i], val, INSERT_VALUES);
 	VecAssemblyBegin(v);
 	VecAssemblyEnd(v);
+	VecGhostUpdateBegin(v, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(v, INSERT_VALUES, SCATTER_FORWARD);
 	valvec.clear();
 	valvec.shrink_to_fit();
 	return 0;
@@ -170,6 +172,8 @@ int FixNaNValues(Vec &b) {
 	VecRestoreArrayRead(b, &b_i);
 	VecAssemblyBegin(b);
 	VecAssemblyEnd(b);
+	VecGhostUpdateBegin(b, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(b, INSERT_VALUES, SCATTER_FORWARD);
 
 	return 0;
 }
@@ -231,6 +235,8 @@ int Trunc2Precision(dolfin::PETScVector &b, PetscScalar trc) {
 	VecRestoreArrayRead(b.vec(), &b_i);
 	VecAssemblyBegin(b.vec());
 	VecAssemblyEnd(b.vec());
+	VecGhostUpdateBegin(b.vec(), INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(b.vec(), INSERT_VALUES, SCATTER_FORWARD);
 
 	return 0;
 }

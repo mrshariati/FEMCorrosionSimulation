@@ -127,9 +127,13 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 
 	VecAssemblyBegin(Ii);
 	VecAssemblyEnd(Ii);
+	VecGhostUpdateBegin(Ii, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Ii, INSERT_VALUES, SCATTER_FORWARD);
 
 	VecAssemblyBegin(BoundaryPhi);
 	VecAssemblyEnd(BoundaryPhi);
+	VecGhostUpdateBegin(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
 
 	PetscBarrier(NULL);
 
@@ -174,9 +178,13 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 
 	VecAssemblyBegin(Ii);
 	VecAssemblyEnd(Ii);
+	VecGhostUpdateBegin(Ii, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Ii, INSERT_VALUES, SCATTER_FORWARD);
 
 	VecAssemblyBegin(BoundaryPhi);
 	VecAssemblyEnd(BoundaryPhi);
+	VecGhostUpdateBegin(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
 
 	PetscBarrier(NULL);
 
@@ -284,6 +292,10 @@ int pH_Compute(dolfin::Function func, dolfin::Function &pH, bool Hbased=true) {
 	VecRestoreArrayRead(as_type<const dolfin::PETScVector>(func.vector())->vec(), &c_i);
 	VecAssemblyBegin(as_type<const dolfin::PETScVector>(pH.vector())->vec());
 	VecAssemblyEnd(as_type<const dolfin::PETScVector>(pH.vector())->vec());
+	VecGhostUpdateBegin(as_type<const dolfin::PETScVector>(pH.vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(as_type<const dolfin::PETScVector>(pH.vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
+
+	PetscBarrier(NULL);
 
 	return 0;
 }

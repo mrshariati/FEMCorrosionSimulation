@@ -335,8 +335,12 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 
 	VecAssemblyBegin(Rp);
 	VecAssemblyEnd(Rp);
+	VecGhostUpdateBegin(Rp, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Rp, INSERT_VALUES, SCATTER_FORWARD);
 	VecAssemblyBegin(Rn);
 	VecAssemblyEnd(Rn);
+	VecGhostUpdateBegin(Rn, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Rn, INSERT_VALUES, SCATTER_FORWARD);
 
 	MatAssemblyBegin(r, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(r, MAT_FINAL_ASSEMBLY);
@@ -379,6 +383,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 
 	VecAssemblyBegin(fStar);
 	VecAssemblyEnd(fStar);
+	VecGhostUpdateBegin(fStar, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(fStar, INSERT_VALUES, SCATTER_FORWARD);
 
 	VecRestoreArrayRead(Rp, &Rp_i);
 	VecRestoreArrayRead(Rn, &Rn_i);

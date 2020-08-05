@@ -582,6 +582,8 @@ int main(int argc,char ** args) {
 	*(Clfuncs[0]->vector()) = *(Clfuncs[1]->vector());
 std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 //change_norm=1e-7;
+//dolfin::File ff_bh(PETSC_COMM_WORLD, "Results/Ii.pvd");
+//ff_bh<<(dolfin::Function(Vh, std::make_shared<dolfin::PETScVector>(Ii)));
 	while (change_norm>1e-6) {
 		//Poisson
 		kappa_Compute({2, -1, 1, 1, -1}, {0.71e-9, 5.27e-9, 9.31e-9, 1.33e-9, 2.03e-9}, {*Mgfuncs[0], *OHfuncs[0], *Hfuncs[0], *Nafuncs[0], *Clfuncs[0]}, *kappa);
@@ -593,8 +595,7 @@ std::cout<<"norm MgVec: "<<change_norm<<std::endl;
 		myLinearSystemAssembler(*L, DBCs, *b_P);
 
 		PetscBarrier(NULL);
-dolfin::File ff_bh(PETSC_COMM_WORLD, "Results/kappa.pvd");
-ff_bh<<(*kappa);
+
 		PSolver->solve(*EFfuncs[0]->vector(), *b_P);
 break;
 		//Mg
