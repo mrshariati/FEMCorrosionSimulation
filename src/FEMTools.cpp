@@ -3,13 +3,12 @@
 using namespace dolfin;
 
 //DOI:10.1007/978-3-642-00605-0
-//Flux-corrected-transport finite element method
-int FEMFCT_Lk_D_Compute(Mat A, Mat &Dk, Mat &Lk) {
+//Computation of symmetric matrix D from stiffness matrix A in Algebraic Flux-corrected finite element method
+int AFC_D_Compute(Mat A, Mat D) {
 	//Input: A
-	//Output: D, Lk
+	//Output: D
 
-	MatZeroEntries(Dk);
-	MatZeroEntries(Lk);
+	MatZeroEntries(D);
 
 	Mat ATr;
 	MatTranspose(A, MAT_INITIAL_MATRIX, &ATr);
@@ -18,6 +17,8 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &Dk, Mat &Lk) {
 	PetscInt A_ToRow;
 
 	MatGetOwnershipRange(A, &A_FromRow, &A_ToRow);
+
+	PetscBarrier(NULL);
 
 	for (PetscInt i = A_FromRow; i < A_ToRow; i = i + 1) {
 		const PetscScalar* a_i;
@@ -84,18 +85,15 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &Dk, Mat &Lk) {
 		}
 		MatRestoreRow(A, i, &ncolsA, &colsA, &a_i);
 		MatRestoreRow(ATr, i, &ncolsATr, &colsATr, &a_j);
-
-		MatSetValues(Dk, 1, &i, d_ind.size(), d_ind.data(), d_i.data(), INSERT_VALUES);
-		MatSetValues(Dk, d_ind.size(), d_ind.data(), 1, &i, d_i.data(), INSERT_VALUES);
+//if(now&&d_i.size()!=0){if(std::abs(d_i[0])>0.0)std::cout<<"ind size: "<<d_i[0]<<std::endl;d_i[0]=1;}
+		MatSetValues(D, 1, &i, d_ind.size(), d_ind.data(), d_i.data(), INSERT_VALUES);
+		MatSetValues(D, d_ind.size(), d_ind.data(), 1, &i, d_i.data(), INSERT_VALUES);
 
 		d_i.clear();
 		d_i.shrink_to_fit();
 		d_ind.clear();
 		d_ind.shrink_to_fit();
 	}
-
-	MatAssemblyBegin(Dk, MAT_FINAL_ASSEMBLY);
-	MatAssemblyEnd(Dk, MAT_FINAL_ASSEMBLY);
 
 	MatDestroy(&ATr);
 
@@ -105,32 +103,27 @@ int FEMFCT_Lk_D_Compute(Mat A, Mat &Dk, Mat &Lk) {
 
 	PetscBarrier(NULL);
 
-	MatDiagonalSet(Dk, vtmp, INSERT_VALUES);
+	MatDiagonalSet(D, vtmp, INSERT_VALUES);
 
 	PetscBarrier(NULL);
 
-	MatGetRowSum(Dk, vtmp);
+	MatGetRowSum(D, vtmp);
 	VecScale(vtmp, -1);
 
 	PetscBarrier(NULL);
 
-	MatDiagonalSet(Dk, vtmp, INSERT_VALUES);
+	MatDiagonalSet(D, vtmp, INSERT_VALUES);
 
 	PetscBarrier(NULL);
 
 	VecDestroy(&vtmp);
 
-	MatCopy(A, Lk, DIFFERENT_NONZERO_PATTERN);
-	MatAXPY(Lk, 1, Dk, SAME_NONZERO_PATTERN);
-
-	PetscBarrier(NULL);
-
 	return 0;
 }
 
 //DOI:10.1016/j.cma.2008.08.016
-//Flux-corrected-transport finite element method
-int FEMFCT_dt_Compute(Mat ML, Mat Lk, PetscReal &dt) {
+//Computation of time step in Algebraic Flux-corrected finite element method for evolutionary convection-diffusion-reaction equation
+int AFC_dt_Compute(Mat ML, Mat Lk, PetscReal &dt) {
 	//Input: ML, Lk
 	//Output: dt
 
@@ -160,8 +153,8 @@ int FEMFCT_dt_Compute(Mat ML, Mat Lk, PetscReal &dt) {
 }
 
 //DOI:10.1016/j.cma.2008.08.016
-//Flux-corrected-transport finite element method
-int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0, PetscReal dt, Mat &r, Vec &fStar) {
+//Computation of anti-diffusive term in Algebraic Flux-corrected finite element method for evolutionary convection-diffusion-reaction equation
+int AFC_EfStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0, PetscReal dt, Mat r, Vec fStar, bool isresidual=true) {
 	//Input: ML, MC, D1, D0, L0, c0, b0, dt
 	//Output: r, f*
 
@@ -322,8 +315,10 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 		Qni = std::min(double(0), Qni);
 		MatSetValues(r, 1, &i, ri_ind.size(), ri_ind.data(), ri.data(), INSERT_VALUES);
 
-		VecSetValue(Rp, i, std::min(1.0, (mi*Qpi)/Ppi), INSERT_VALUES);
-		VecSetValue(Rn, i, std::min(1.0, (mi*Qni)/Pni), INSERT_VALUES);
+		if (std::abs(Ppi)>1e-30)
+			VecSetValue(Rp, i, std::min(1.0, (mi*Qpi)/Ppi), INSERT_VALUES);
+		if (std::abs(Pni)>1e-30)
+			VecSetValue(Rn, i, std::min(1.0, (mi*Qni)/Pni), INSERT_VALUES);
 
 		MatRestoreRow(MC, i, &ncolsMC, &colsMC, &mc_i);
 		MatRestoreRow(D0, i, &ncolsD0, &colsD0, &d0_i);
@@ -332,6 +327,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 		ri_ind.clear();
 		ri.shrink_to_fit();
 	}
+
+	PetscBarrier(NULL);
 
 	VecAssemblyBegin(Rp);
 	VecAssemblyEnd(Rp);
@@ -344,6 +341,8 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 
 	MatAssemblyBegin(r, MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(r, MAT_FINAL_ASSEMBLY);
+
+	PetscBarrier(NULL);
 
 	VecRestoreArrayRead(c0_SEQ, &c0_i);
 	VecRestoreArrayRead(v1Over2_SEQ, &v_i);
@@ -369,17 +368,22 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 		fi = double(0);
 
 		for (PetscInt j = 0; j < ncolsr; j = j + 1) {
-			if (r_i[j]>double(0)) {
-				fi = fi + std::min(Rp_i[i], Rn_i[colsr[j]])*r_i[j];
-			}
+			if (isresidual)
+				fi = fi + r_i[j];//all alfa_ij=1, usual FEM
 			else {
-				fi = fi + std::min(Rn_i[i], Rp_i[colsr[j]])*r_i[j];
+				if (r_i[j]>double(0)) {
+					fi = fi + std::min(Rp_i[i], Rn_i[colsr[j]])*r_i[j];
+				}
+				else {
+					fi = fi + std::min(Rn_i[i], Rp_i[colsr[j]])*r_i[j];
+				}
 			}
 		}
-		if (std::abs(fi)>double(0))
-			VecSetValue(fStar, i, fi, INSERT_VALUES);
+		VecSetValue(fStar, i, fi, INSERT_VALUES);
 		MatRestoreRow(r, i, &ncolsr, &colsr, &r_i);
 	}
+
+	PetscBarrier(NULL);
 
 	VecAssemblyBegin(fStar);
 	VecAssemblyEnd(fStar);
@@ -397,9 +401,145 @@ int FEMFCT_fStar_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat L0, Vec c0, Vec b0,
 	return 0;
 }
 
+//DOI:10.1137/15M1018216
+//Computation of right hand side for the fixed-point method of the system yeilded from Algebraic Flux-corrected finite element method for convection-diffusion-reaction equation
+int AFC_fStar_Compute(Mat A, Mat D, Vec c, Vec fStar) {
+	//Input: A, D, ci
+	//Output: f* in A*ci=-f*(ci) as fixed-point
+
+	VecSet(fStar, 0);
+
+	//each processor needs other processors indices of ci (the matrices are already row-wise)
+	VecScatter par2seq;
+	Vec c_SEQ;
+
+	VecScatterCreateToAll(c, &par2seq, &c_SEQ);
+	VecScatterBegin(par2seq, c, c_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(par2seq, c, c_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+
+	PetscBarrier(NULL);
+
+	VecScatterDestroy(&par2seq);
+
+	PetscInt D_FromRow;
+	PetscInt D_ToRow;
+
+	MatGetOwnershipRange(D, &D_FromRow, &D_ToRow);
+
+	Vec Rp, Rn;
+	VecDuplicate(c_SEQ, &Rp);
+	VecSet(Rp, 1);
+	VecDuplicate(c_SEQ, &Rn);
+	VecSet(Rn, 1);
+
+	const PetscScalar* c_i;
+
+	VecGetArrayRead(c_SEQ, &c_i);
+
+	for (PetscInt i = D_FromRow; i < D_ToRow; i = i + 1) {
+		const PetscScalar* d_i;
+		const PetscInt* colsD;
+		PetscInt ncolsD;
+
+		MatGetRow(D, i, &ncolsD, &colsD, &d_i);
+
+		PetscScalar aij = 0;
+		PetscScalar aji = 0;
+		PetscScalar Ppi = 0;
+		PetscScalar Pni = 0;
+		PetscScalar Qpi = 0;
+		PetscScalar Qni = 0;
+
+		for (PetscInt j = 0; j < ncolsD; j = j + 1) {
+			MatGetValues(A, 1, &i, 1, &colsD[j], &aij);
+			MatGetValues(A, 1, &colsD[j], 1, &i, &aji);
+			if (aji<=aij) {
+				Ppi = Ppi + std::max(double(0), d_i[j]*(c_i[colsD[j]]-c_i[i]));
+				Pni = Pni + std::min(double(0), d_i[j]*(c_i[colsD[j]]-c_i[i]));
+			}
+			Qpi = Qpi + std::min(double(0), d_i[j]*(c_i[colsD[j]]-c_i[i]));
+			Qni = Qni + std::max(double(0), d_i[j]*(c_i[colsD[j]]-c_i[i]));
+
+		}
+
+		Qpi = -Qpi;
+		Qni = -Qni;
+
+		if (std::abs(Ppi)>1e-23)
+			VecSetValue(Rp, i, std::min(1.0, Qpi/Ppi), INSERT_VALUES);
+		if (std::abs(Pni)>1e-23)
+			VecSetValue(Rn, i, std::min(1.0, Qni/Pni), INSERT_VALUES);
+
+		MatRestoreRow(D, i, &ncolsD, &colsD, &d_i);
+	}
+
+	PetscBarrier(NULL);
+
+	VecAssemblyBegin(Rp);
+	VecAssemblyEnd(Rp);
+	VecGhostUpdateBegin(Rp, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Rp, INSERT_VALUES, SCATTER_FORWARD);
+	VecAssemblyBegin(Rn);
+	VecAssemblyEnd(Rn);
+	VecGhostUpdateBegin(Rn, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Rn, INSERT_VALUES, SCATTER_FORWARD);
+
+	// fStar
+	const PetscScalar* Rp_i;
+	const PetscScalar* Rn_i;
+
+	VecGetArrayRead(Rp, &Rp_i);
+	VecGetArrayRead(Rn, &Rn_i);
+
+	PetscScalar fij;
+	for (PetscInt i = D_FromRow; i < D_ToRow; i = i + 1) {
+		const PetscScalar* d_i;
+		const PetscInt* colsD;
+		PetscInt ncolsD;
+
+		MatGetRow(D, i, &ncolsD, &colsD, &d_i);
+
+		PetscScalar aij = 0;
+		PetscScalar aji = 0;
+		fij = double(0);
+
+		for (PetscInt j = 0; j < ncolsD; j = j + 1) {
+			fij = d_i[j]*(c_i[colsD[j]]-c_i[i]);
+			MatGetValues(A, 1, &i, 1, &colsD[j], &aij);
+			MatGetValues(A, 1, &colsD[j], 1, &i, &aji);
+			if (aji<=aij) {
+				if (fij>0) {
+					VecSetValue(fStar, i, (1-Rp_i[i])*fij, INSERT_VALUES);
+				}
+				if (fij<0) {
+					VecSetValue(fStar, i, (1-Rn_i[i])*fij, INSERT_VALUES);
+				}
+			}
+		}
+	}
+
+	VecAssemblyBegin(fStar);
+	VecAssemblyEnd(fStar);
+	VecGhostUpdateBegin(fStar, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(fStar, INSERT_VALUES, SCATTER_FORWARD);
+
+	PetscBarrier(NULL);
+
+	VecRestoreArrayRead(c_SEQ, &c_i);
+	VecDestroy(&c_SEQ);
+
+	VecRestoreArrayRead(Rp, &Rp_i);
+	VecRestoreArrayRead(Rn, &Rn_i);
+	VecDestroy(&Rp);
+	VecDestroy(&Rn);
+
+	return 0;
+}
+
+
 //DOI:10.1016/j.cma.2008.08.016
 //Flux-corrected-transport finite element method
-int FEMFCT_ML_Compute(Mat MC, Mat &ML) {
+int FEMFCT_ML_Compute(Mat MC, Mat ML) {
 	//Input: MC
 	//Output: ML
 

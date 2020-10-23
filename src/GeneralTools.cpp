@@ -21,7 +21,20 @@ int funcsLinSum(std::vector<int> zi, std::vector<dolfin::Function> ci, dolfin::F
 	return 0;
 }
 
-int VecSetOnDOFs(std::vector<size_t> DOFsSet, Vec &v, double val) {
+int VecSetOnLocalDOFs(std::vector<size_t> DOFsSet, Vec v, double val) {
+	std::vector<double> valvec(DOFsSet.size(), val);
+	for (size_t i=0; i<DOFsSet.size(); i = i + 1)
+		VecSetValueLocal(v, DOFsSet[i], val, INSERT_VALUES);
+	VecAssemblyBegin(v);
+	VecAssemblyEnd(v);
+	VecGhostUpdateBegin(v, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(v, INSERT_VALUES, SCATTER_FORWARD);
+	valvec.clear();
+	valvec.shrink_to_fit();
+	return 0;
+}
+
+int VecSetOnDOFs(std::vector<size_t> DOFsSet, Vec v, double val) {
 	std::vector<double> valvec(DOFsSet.size(), val);
 	for (size_t i=0; i<DOFsSet.size(); i = i + 1)
 		VecSetValue(v, DOFsSet[i], val, INSERT_VALUES);
@@ -119,7 +132,7 @@ int Vector_of_ConstFunctionGenerator(std::shared_ptr<dolfin::FunctionSpace> Vh, 
 	return 0;
 }
 
-int FixNaNValues(Mat &A) {
+int FixNaNValues(Mat A) {
 	PetscInt A_FromRow;
 	PetscInt A_ToRow;
 
@@ -151,7 +164,7 @@ int FixNaNValues(Mat &A) {
 	return 0;
 }
 
-int FixNaNValues(Vec &b) {
+int FixNaNValues(Vec b) {
 	PetscInt lsize;
 	VecGetLocalSize(b, &lsize);
 

@@ -95,7 +95,7 @@ double Current2ElectricField(std::vector<double> Phi, std::vector<double> i, dou
 
 //Doi: 10.1149/2.0071501jes
 //EQ[11], EQ[12]
-int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double eps0, double teta0, double l0, Vec &Ii, Vec &BoundaryPhi, std::vector<double> UData, std::vector<double> iMgData) {
+int iMg(std::vector<size_t> LocalDOFSet_bar, double t, double dt, Vec cMg, Vec cOH, double eps0, double teta0, double l0, Vec Ii, Vec BoundaryPhi, std::vector<double> UData, std::vector<double> iMgData, Vec Vec_l,  Vec Vec_teta,  Vec Vec_eps) {
 	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l0
 	//Output: Ii
 
@@ -113,16 +113,21 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 	VecGetArrayRead(cMg, &cMg_i);
 	VecGetArrayRead(cOH, &cOH_i);
 
+	PetscBarrier(NULL);
+
 	//Computing the electerical current
 	for (size_t j = 0; j < LocalDOFSet_bar.size(); j = j + 1) {
 		eps = epsODE(t, eps0, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
-		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*t + l0;
+		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*dt + l0;
 		teta = tetaODE(t, teta0, l, eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
 		iElectrode = iElectrodeFormula(teta, eps);
 		VecSetValueLocal(Ii, LocalDOFSet_bar[j], iElectrode, INSERT_VALUES);
 		//extracting dirichlet condition for electric field
 		UElectrode = Current2ElectricField(UData, iMgData, iElectrode);
 		VecSetValueLocal(BoundaryPhi, LocalDOFSet_bar[j], UElectrode, INSERT_VALUES);
+		VecSetValueLocal(Vec_l, LocalDOFSet_bar[j], l, ADD_VALUES);
+		VecSetValueLocal(Vec_teta, LocalDOFSet_bar[j], teta, INSERT_VALUES);
+		VecSetValueLocal(Vec_eps, LocalDOFSet_bar[j], eps, INSERT_VALUES);
 	}
 
 	VecAssemblyBegin(Ii);
@@ -135,6 +140,21 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 	VecGhostUpdateBegin(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
 	VecGhostUpdateEnd(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
 
+	VecAssemblyBegin(Vec_l);
+	VecAssemblyEnd(Vec_l);
+	VecGhostUpdateBegin(Vec_l, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Vec_l, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecAssemblyBegin(Vec_teta);
+	VecAssemblyEnd(Vec_teta);
+	VecGhostUpdateBegin(Vec_teta, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Vec_teta, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecAssemblyBegin(Vec_eps);
+	VecAssemblyEnd(Vec_eps);
+	VecGhostUpdateBegin(Vec_eps, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Vec_eps, INSERT_VALUES, SCATTER_FORWARD);
+
 	PetscBarrier(NULL);
 
 	VecRestoreArrayRead(cMg, &cMg_i);
@@ -145,7 +165,7 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 
 //Doi: 10.1149/2.0071501jes
 //EQ[11], EQ[13]
-int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double eps0, double teta0, double l0, Vec &Ii, Vec &BoundaryPhi, std::vector<double> UData, std::vector<double> iAlData) {
+int iOH(std::vector<size_t> LocalDOFSet_bar, double t, double dt, Vec cMg, Vec cOH, double eps0, double teta0, double l0, Vec Ii, Vec BoundaryPhi, std::vector<double> UData, std::vector<double> iAlData, Vec Vec_l,  Vec Vec_teta,  Vec Vec_eps) {
 	//Input: Dofset on boundary, t, cMg, cOH, Resource limit, eps0, teta0, l0
 	//Output: Ii
 
@@ -163,10 +183,12 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 	VecGetArrayRead(cMg, &cMg_i);
 	VecGetArrayRead(cOH, &cOH_i);
 
+	PetscBarrier(NULL);
+
 	//Computing the electerical current
 	for (size_t j = 0; j < LocalDOFSet_bar.size(); j = j + 1) {
 		eps = epsODE(t, eps0, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
-		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*t + l0;
+		l = uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])*dt + l0;
 		teta = tetaODE(t, teta0, l, eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]]);
 //if((1 - teta + eps*teta)>0.9||(1 - teta + eps*teta)<0.5){std::cout<<"iOH_reduced issue: "<<"teta = "<<teta<<", eps = "<<eps<<", u_dep = "<<uDep(eps, cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]])<<std::endl;std::cin>>iElectrode;}
 		iElectrode = iElectrodeFormula(teta, eps);
@@ -174,6 +196,9 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 		//extracting dirichlet condition for electric field
 		UElectrode = Current2ElectricField(UData, iAlData, iElectrode);
 		VecSetValueLocal(BoundaryPhi, LocalDOFSet_bar[j], UElectrode, INSERT_VALUES);
+		VecSetValueLocal(Vec_l, LocalDOFSet_bar[j], l, ADD_VALUES);
+		VecSetValueLocal(Vec_teta, LocalDOFSet_bar[j], teta, INSERT_VALUES);
+		VecSetValueLocal(Vec_eps, LocalDOFSet_bar[j], eps, INSERT_VALUES);
 	}
 
 	VecAssemblyBegin(Ii);
@@ -186,6 +211,21 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 	VecGhostUpdateBegin(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
 	VecGhostUpdateEnd(BoundaryPhi, INSERT_VALUES, SCATTER_FORWARD);
 
+	VecAssemblyBegin(Vec_l);
+	VecAssemblyEnd(Vec_l);
+	VecGhostUpdateBegin(Vec_l, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Vec_l, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecAssemblyBegin(Vec_teta);
+	VecAssemblyEnd(Vec_teta);
+	VecGhostUpdateBegin(Vec_teta, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Vec_teta, INSERT_VALUES, SCATTER_FORWARD);
+
+	VecAssemblyBegin(Vec_eps);
+	VecAssemblyEnd(Vec_eps);
+	VecGhostUpdateBegin(Vec_eps, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Vec_eps, INSERT_VALUES, SCATTER_FORWARD);
+
 	PetscBarrier(NULL);
 
 	VecRestoreArrayRead(cMg, &cMg_i);
@@ -197,7 +237,7 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, double t, Vec cMg, Vec cOH, double 
 
 //Doi: 10.1149/2.0071501jes
 //EQ[5]
-int WaterDissociation(Vec cH, Vec cOH, Vec &Reaction) {
+int WaterDissociation(Vec cH, Vec cOH, Vec Reaction) {
 	//Input: cH, cOH
 	//Output: ROH=RH
 
@@ -209,12 +249,11 @@ int WaterDissociation(Vec cH, Vec cOH, Vec &Reaction) {
 	VecPointwiseMax(cOH, cOH, vtmp);// negative concentrations set to zero
 
 	//EQ[5]
-	VecSet(Reaction, 1e-8);//Kw
+	VecSet(Reaction, 1.4e-4);//Kw
 	VecPointwiseMult(vtmp, cH, cOH);
-	VecAXPY(Reaction, -1, vtmp);
-	VecScale(Reaction, 1.4e4);
+	VecAXPY(Reaction, -1.4e4, vtmp);
 
-	VecSet(vtmp, 55.555);//positive reaction is subjected to available water
+	VecSet(vtmp, 55.555e-3);//positive reaction is subjected to available water
 	VecPointwiseMin(Reaction, Reaction, vtmp);
 
 	VecCopy(cH, vtmp);//negative reaction is subjected to available cH and cOH
@@ -225,6 +264,9 @@ int WaterDissociation(Vec cH, Vec cOH, Vec &Reaction) {
 	VecPointwiseMax(Reaction, Reaction, vtmp);
 
 	PetscBarrier(NULL);
+
+	VecGhostUpdateBegin(Reaction, INSERT_VALUES, SCATTER_FORWARD);
+	VecGhostUpdateEnd(Reaction, INSERT_VALUES, SCATTER_FORWARD);
 
 	VecDestroy(&vtmp);
 
