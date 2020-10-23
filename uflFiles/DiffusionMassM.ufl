@@ -1,0 +1,14 @@
+#Finite Element
+cell = triangle;
+H = FiniteElement("CG", cell, 1)
+
+ci = TrialFunction(H)
+v = TestFunction(H)
+
+ci0 = Coefficient(H)
+
+#Create stiffness matrix
+a = ci*v*dx
+L = ci0*v*dx
+
+# ffc -l dolfin DiffusionMassM.ufl

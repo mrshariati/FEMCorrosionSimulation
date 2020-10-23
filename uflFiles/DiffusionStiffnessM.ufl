@@ -5,15 +5,11 @@ H = FiniteElement("CG", cell, 1)
 ci = TrialFunction(H)
 v = TestFunction(H)
 
-phi = Coefficient(H)
 Ii = Coefficient(H)
 Di = Constant(cell)
-zi = Constant(cell)
-
-FoverRT=39.3179
 
 #Create stiffness matrix
-a = Di*inner((grad(ci) + zi*FoverRT*ci*grad(phi)), grad(v))*dx
-L = -Ii*v*ds
+a = Di*ci.dx(1)*v.dx(1)*dx
+L = Ii*v*ds
 
-# ffc -l dolfin StiffnessMatrix.ufl
+# ffc -l dolfin DiffusionStiffnessM.ufl

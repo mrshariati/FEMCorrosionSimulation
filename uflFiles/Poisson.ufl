@@ -3,12 +3,11 @@ H = FiniteElement("CG", cell, 1)
 phi = TrialFunction(H)
 v = TestFunction(H)
 
+kappa = Coefficient(H)
 f = Coefficient(H)
+g = Coefficient(H)
 
-e = 1.60217662e-19
-#xi = 80
-
-a = inner(grad(phi), grad(v))*dx
-L = e*f*v*dx
+a = kappa*inner(grad(phi), grad(v))*dx
+L = f*v*dx + kappa*g*v*ds
 
 # ffc -l dolfin Poisson.ufl
