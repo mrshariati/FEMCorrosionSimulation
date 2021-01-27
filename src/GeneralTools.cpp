@@ -138,17 +138,14 @@ int FixNaNValues(Mat A) {
 
 	MatGetOwnershipRange(A, &A_FromRow, &A_ToRow);
 
+	const PetscScalar* a_i;
+	const PetscInt* colsA;
+	PetscInt ncolsA;
+	std::vector<PetscScalar> z_i;
+	std::vector<PetscInt> z_ind;
+
 	for (PetscInt i = A_FromRow; i < A_ToRow; i = i + 1) {
-
-		const PetscScalar* a_i;
-		const PetscInt* colsA;
-		PetscInt ncolsA;
-
-		std::vector<PetscScalar> z_i;
-		std::vector<PetscInt> z_ind;
-
 		MatGetRow(A, i, &ncolsA, &colsA, &a_i);
-
 		for (PetscInt j=0; j < ncolsA; j = j + 1) {
 			if (!PetscIsNormalReal(a_i[j])) {
 				z_ind.push_back(colsA[j]);
@@ -157,6 +154,10 @@ int FixNaNValues(Mat A) {
 		}
 		MatSetValues(A, 1, &i, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
 		MatRestoreRow(A, i, &ncolsA, &colsA, &a_i);
+		z_i.clear();
+		z_i.shrink_to_fit();
+		z_ind.clear();
+		z_ind.shrink_to_fit();
 	}
 	MatAssemblyBegin(A,MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A,MAT_FINAL_ASSEMBLY);
@@ -170,7 +171,6 @@ int FixNaNValues(Vec b) {
 
 	std::vector<PetscScalar> z_i;
 	std::vector<PetscInt> z_ind;
-
 	const PetscScalar* b_i;
 	VecGetArrayRead(b, &b_i);
 
@@ -199,17 +199,14 @@ int Trunc2Precision(dolfin::PETScMatrix &A, PetscScalar trc) {
 
 	MatGetOwnershipRange(A.mat(), &A_FromRow, &A_ToRow);
 
+	const PetscScalar* a_i;
+	const PetscInt* colsA;
+	PetscInt ncolsA;
+	std::vector<PetscScalar> z_i;
+	std::vector<PetscInt> z_ind;
+
 	for (PetscInt i = A_FromRow; i < A_ToRow; i = i + 1) {
-
-		const PetscScalar* a_i;
-		const PetscInt* colsA;
-		PetscInt ncolsA;
-
-		std::vector<PetscScalar> z_i;
-		std::vector<PetscInt> z_ind;
-
 		MatGetRow(A.mat(), i, &ncolsA, &colsA, &a_i);
-
 		for (PetscInt j=0; j < ncolsA; j = j + 1) {
 			if ((std::abs(a_i[j])<trc && a_i[j]!=0) || (!PetscIsNormalReal(a_i[j]) && a_i[j]!=0)) {
 				z_ind.push_back(colsA[j]);
@@ -218,6 +215,10 @@ int Trunc2Precision(dolfin::PETScMatrix &A, PetscScalar trc) {
 		}
 		MatSetValues(A.mat(), 1, &i, z_i.size(), z_ind.data(), z_i.data(), INSERT_VALUES);
 		MatRestoreRow(A.mat(), i, &ncolsA, &colsA, &a_i);
+		z_i.clear();
+		z_i.shrink_to_fit();
+		z_ind.clear();
+		z_ind.shrink_to_fit();
 	}
 	MatAssemblyBegin(A.mat(), MAT_FINAL_ASSEMBLY);
 	MatAssemblyEnd(A.mat(), MAT_FINAL_ASSEMBLY);
@@ -233,7 +234,6 @@ int Trunc2Precision(dolfin::PETScVector &b, PetscScalar trc) {
 
 	std::vector<PetscScalar> z_i;
 	std::vector<PetscInt> z_ind;
-
 	const PetscScalar* b_i;
 	VecGetArrayRead(b.vec(), &b_i);
 
@@ -251,41 +251,52 @@ int Trunc2Precision(dolfin::PETScVector &b, PetscScalar trc) {
 	VecGhostUpdateBegin(b.vec(), INSERT_VALUES, SCATTER_FORWARD);
 	VecGhostUpdateEnd(b.vec(), INSERT_VALUES, SCATTER_FORWARD);
 
+	z_i.clear();
+	z_i.shrink_to_fit();
+	z_ind.clear();
+	z_ind.shrink_to_fit();
+
 	return 0;
 }
 
 
-int myLinearSystemAssembler(dolfin::Form a, dolfin::Form L, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScMatrix &A, dolfin::PETScVector &b) {
+int Weak2Matrix(dolfin::Form a, dolfin::Form L, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScMatrix &A, dolfin::PETScVector &b) {
 	if (!(A.empty()))
 		A.zero();
 	if (!(b.empty()))
 		b.zero();
 	dolfin::assemble(A, a);
-	Trunc2Precision(A, 1e-23);
 	dolfin::assemble(b, L);
-	Trunc2Precision(b, 1e-23);
 	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
 		DBCs[i].apply(A, b);
 	}
 	return 0;
 }
 
-int myLinearSystemAssembler(dolfin::Form a, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScMatrix &A) {
+int Weak2Matrix(dolfin::Form a, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScMatrix &A, dolfin::PETScVector &b) {
 	if (!(A.empty()))
 		A.zero();
 	dolfin::assemble(A, a);
-	Trunc2Precision(A, 1e-23);
+	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
+		DBCs[i].apply(A, b);
+	}
+	return 0;
+}
+
+int Weak2Matrix(dolfin::Form a, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScMatrix &A) {
+	if (!(A.empty()))
+		A.zero();
+	dolfin::assemble(A, a);
 	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
 		DBCs[i].apply(A);
 	}
 	return 0;
 }
 
-int myLinearSystemAssembler(dolfin::Form L, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScVector &b) {
+int Weak2Matrix(dolfin::Form L, std::vector<dolfin::DirichletBC> DBCs, dolfin::PETScVector &b) {
 	if (!(b.empty()))
 		b.zero();
 	dolfin::assemble(b, L);
-	Trunc2Precision(b, 1e-23);
 	for (std::size_t i = 0; i < DBCs.size(); i = i + 1) {
 		DBCs[i].apply(b);
 	}
@@ -299,9 +310,72 @@ int myDirichletBCGenerator(std::shared_ptr<dolfin::FunctionSpace> Vh, std::vecto
 	return 0;
 }
 
-int myFormAssigner(dolfin::Form &a, std::vector<std::string> names, std::vector<std::shared_ptr<dolfin::GenericFunction>> fs) {
+int WeakAssign(dolfin::Form &a, std::vector<std::string> names, std::vector<std::shared_ptr<dolfin::GenericFunction>> fs) {
 	for (std::size_t i = 0; i < names.size(); i = i + 1) {
 		a.set_coefficient(names[i], fs[i]);
 	}
+	return 0;
+}
+
+int MatPointwiseMult(Mat alpha, Mat beta, Mat r) {//alpha and r or beta and r can be similar. This useful function was not implemented in Petsc
+	//Input: alpha, beta
+	//Output: r
+
+	MatZeroEntries(r);
+
+	PetscInt alpha_FromRow;
+	PetscInt alpha_ToRow;
+
+	MatGetOwnershipRange(alpha, &alpha_FromRow, &alpha_ToRow);
+
+	const PetscScalar* alpha_i;
+	const PetscInt* colsalpha;
+	PetscInt ncolsalpha;
+	const PetscScalar* beta_i;
+	const PetscInt* colsbeta;
+	PetscInt ncolsbeta;
+	PetscInt j;
+	PetscInt k;
+	std::vector<PetscScalar> ri;
+	std::vector<PetscInt> ri_ind;
+
+	PetscBarrier(NULL);
+
+	for (PetscInt i = alpha_FromRow; i < alpha_ToRow; i = i + 1) {
+		MatGetRow(alpha, i, &ncolsalpha, &colsalpha, &alpha_i);
+		MatGetRow(beta, i, &ncolsbeta, &colsbeta, &beta_i);
+
+		j = 0;
+		k = 0;
+
+		while (j < ncolsalpha && k < ncolsbeta) { 
+			if (colsalpha[j] < colsbeta[k]) {
+				j = j + 1;
+			}
+			else if (colsbeta[k] < colsalpha[j]) {
+				k = k + 1;
+			}
+			else {
+				ri_ind.push_back(colsalpha[j]);
+				ri.push_back(alpha_i[j]*beta_i[k]);
+				k = k + 1;
+				j = j + 1;
+			}
+		}
+		MatSetValues(r, 1, &i, ri_ind.size(), ri_ind.data(), ri.data(), INSERT_VALUES);
+		MatRestoreRow(alpha, i, &ncolsalpha, &colsalpha, &alpha_i);
+		MatRestoreRow(beta, i, &ncolsbeta, &colsbeta, &beta_i);
+
+		ri.clear();
+		ri.shrink_to_fit();
+		ri_ind.clear();
+		ri_ind.shrink_to_fit();
+	}
+
+	PetscBarrier(NULL);
+
+	MatAssemblyBegin(r, MAT_FINAL_ASSEMBLY);
+	MatAssemblyEnd(r, MAT_FINAL_ASSEMBLY);
+
 	return 0;
 }
