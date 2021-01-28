@@ -57,52 +57,30 @@ int SharedTypeVectorDestructor(std::vector<std::shared_ptr<myType>> &vshrtype) {
 }
 
 int FunctionFilterAvg(Vec func, dolfin::FunctionSpace Vh, dolfin::Mesh mesh) {
-	const PetscScalar* f_i;
-	const unsigned int *nb;
-	std::vector<std::size_t> NeighbourhoodVertices;
-	double avg;
-	PetscInt VecLocalsize, ConnectedEdgesize, n;
+	//To access all neighbours we need to transform it from mpi to sequential
+	VecScatter par2seq;
+	Vec func_SEQ;
+	VecScatterCreateToAll(func, &par2seq, &func_SEQ);
+	VecScatterBegin(par2seq, func, func_SEQ, INSERT_VALUES, SCATTER_FORWARD);
+	VecScatterEnd(par2seq, func, func_SEQ, INSERT_VALUES, SCATTER_FORWARD);
 
-	VecGetLocalSize(func, &VecLocalsize);
-	VecGetArrayRead(func, &f_i);
-	std::vector<std::size_t> dof2v = dolfin::dof_to_vertex_map(Vh);
-	std::vector<int> v2dof = dolfin::vertex_to_dof_map(Vh);
+	PetscBarrier((PetscObject)func_SEQ);
+
+	const PetscScalar* f_i;
+	PetscInt size;
+	VecGetArrayRead(func_SEQ, &f_i);
+	VecGetSize(func_SEQ, &size);
+	std::vector<std::size_t> dof2vindex = dolfin::dof_to_vertex_map(Vh);
 	mesh.init(0,1);
+	const unsigned int *nb;
 
 	//filter out negative values by average of their positive neighbours
-	for (std::size_t i=0; i<VecLocalsize; i=i+1) {
+	for (std::size_t i=0; i<size; i=i+1) {
 		if (f_i[i]<0) {
-			avg=0;
-			n=0;
-			nb = Vertex(mesh, dof2v[i]).entities(1);
-			ConnectedEdgesize = Vertex(mesh, dof2v[i]).num_entities(1);
-			for (std::size_t j=0; j<ConnectedEdgesize; j=j+1) {
-				if ((Edge(mesh, dof2v[j]).entities(0))[0]!=dof2v[i]) {
-					NeighbourhoodVertices.push_back(v2dof[(Edge(mesh, dof2v[j]).entities(0))[0]]);
-				}
-				else {
-					NeighbourhoodVertices.push_back(v2dof[(Edge(mesh, dof2v[j]).entities(0))[1]]);
-				}
-			}
-			for (std::size_t k=0; k<NeighbourhoodVertices.size(); k=k+1) {
-				if (f_i[NeighbourhoodVertices[k]]>=0) {
-					avg = avg + f_i[NeighbourhoodVertices[k]];
-					n = n+1;
-				}
-			}
-			if (n>0) {
-				VecSetValueLocal(func, i, avg/n, INSERT_VALUES);
-			}
+			nb = Vertex(mesh, dof2vindex[i]).entities(1);
+			std::cout<<"num entities:"<<Vertex(mesh, dof2vindex[i]).num_entities(1)<<", vertex index:"<<dof2vindex[i]<<", nb[0]="<<nb[0]<<", nb[1]="<<nb[1]<<", nb[2]="<<nb[4]<<std::endl;
 		}
 	}
-	VecAssemblyBegin(func);
-	VecAssemblyEnd(func);
-	VecGhostUpdateBegin(func, INSERT_VALUES, SCATTER_FORWARD);
-	VecGhostUpdateEnd(func, INSERT_VALUES, SCATTER_FORWARD);
-
-	PetscBarrier(NULL);
-
-	VecRestoreArrayRead(func, &f_i);
 
 	return 0;
 }

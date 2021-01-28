@@ -709,19 +709,16 @@ int nonLinAFC_alpha_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat A0, Vec c0, Vec 
 		MatGetRow(r, i, &ncolsr, &colsr, &r_i);//a row of matrix beta_tilde (r)
 		//we will read the beta_tilde row by row and then transfer it to alpha after we finished by a row
 		for (PetscInt j = 0; j < ncolsr; j = j + 1) {
-			if (colsr[j] >= i) {
-				if (r_i[j]>double(0)) {
-					alphai_ind.push_back(colsr[j]);//in paper for alpha m=i and n=colsr[j]
-					alphai.push_back(std::min(Rp_i[i], Rn_i[colsr[j]]));
-				}
-				else {
-					alphai_ind.push_back(colsr[j]);
-					alphai.push_back(std::min(Rn_i[i], Rp_i[colsr[j]]));
-				}
+			if (r_i[j]>double(0)) {
+				alphai_ind.push_back(colsr[j]);//in paper for alpha m=i and n=colsr[j]
+				alphai.push_back(std::min(Rp_i[i], Rn_i[colsr[j]]));
+			}
+			else {
+				alphai_ind.push_back(colsr[j]);
+				alphai.push_back(std::min(Rn_i[i], Rp_i[colsr[j]]));
 			}
 		}
 		MatSetValues(alpha, 1, &i, alphai_ind.size(), alphai_ind.data(), alphai.data(), INSERT_VALUES);
-		MatSetValues(alpha, alphai_ind.size(), alphai_ind.data(), 1, &i, alphai.data(), INSERT_VALUES);
 		MatRestoreRow(r, i, &ncolsr, &colsr, &r_i);
 
 		alphai.clear();

@@ -67,7 +67,7 @@ int main(int argc,char ** args) {
 	std::vector<std::shared_ptr<dolfin::Function>> Mgfuncs;//keeping all the functions for Magnesium concentration in a vector
 	isconst.clear(); isconst.shrink_to_fit();
 	isconst = {1, 0};
-	std::vector<double> constvalue = {0};
+	std::vector<double> constvalue = {1e-15};
 	Vector_of_NonConstFunctionGenerator(Vh, Mgfuncs, isconst, constvalue);
 
 	std::vector<std::shared_ptr<dolfin::GenericFunction>> Mgconsts;//keeping all the constants for Magnesium concentration in a vector
@@ -231,7 +231,7 @@ int main(int argc,char ** args) {
 	
 	//to apply adaptive time step
 	AFC_L_Compute(A0_Mg->mat(), G0_Mg->mat(), tmpmatrix_np->mat());
-	dt_Adaptive = std::min(dt_Adaptive, AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat()));
+	dt_Adaptive = 0.05*AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat());
 
 	//OH
 	auto A0_OH = std::make_shared<dolfin::PETScMatrix>(*MCmatrix_np);
@@ -332,7 +332,7 @@ int main(int argc,char ** args) {
 	auto pH = std::make_shared<dolfin::Function>(Vh);
 
 	pH_Compute(*OHfuncs[0], *pH, false);
-
+FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
 	//storing
 	auto StoringStream_p = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/Electric Field.pvd");
 	StoringStream_p->operator<<(*ElectricFieldfuncs[0]);	
@@ -371,8 +371,11 @@ int main(int argc,char ** args) {
 
 	//time
 	t = dt + t;
+	if(prcID==0) {
+		std::cout<<"Time step dt: "<<dt<<std::endl;
+	}
 	dt = dt_Adaptive;
-std::cout<<dt<<std::endl;
+
 	//Printing
 	//Poisson
 	PetscScalar minval = as_type<const dolfin::PETScVector>(ElectricFieldfuncs[0]->vector())->min();
@@ -439,7 +442,7 @@ std::cout<<dt<<std::endl;
 
 		//to apply adaptive time step
 		AFC_L_Compute(A0_Mg->mat(), G0_Mg->mat(), tmpmatrix_np->mat());
-		dt_Adaptive = std::min(dt_Adaptive, AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat()));
+		dt_Adaptive = 0.05*AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat());
 
 		//updating A0
 		MatCopy(Amatrix_np->mat(), A0_Mg->mat(), DIFFERENT_NONZERO_PATTERN);
@@ -555,6 +558,9 @@ std::cout<<dt<<std::endl;
 
 		//time
 		t = dt + t;
+		if(prcID==0) {
+			std::cout<<"Time step dt: "<<dt<<std::endl;
+		}
 		dt = dt_Adaptive;
 		
 		//storage step
