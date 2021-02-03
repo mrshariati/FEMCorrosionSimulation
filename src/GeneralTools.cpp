@@ -104,6 +104,13 @@ int FunctionFilterAvg(Vec func, dolfin::FunctionSpace Vh, dolfin::Mesh mesh) {
 
 	VecRestoreArrayRead(func, &f_i);
 
+	NeighbourhoodVertices.clear();
+	NeighbourhoodVertices.shrink_to_fit();
+	dof2v.clear();
+	dof2v.shrink_to_fit();
+	v2dof.clear();
+	v2dof.shrink_to_fit();
+
 	return 0;
 }
 

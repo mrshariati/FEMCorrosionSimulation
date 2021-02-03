@@ -86,17 +86,6 @@ int main(int argc,char ** args) {
 	constvalue = {5.27e-9, -1};
 	Vector_of_ConstFunctionGenerator(Vh, OHconsts, constvalue);
 
-	//H
-	std::vector<std::shared_ptr<dolfin::Function>> Hfuncs;//keeping all the functions for proton concentration in a vector
-	constvalue.clear(); constvalue.shrink_to_fit();
-	constvalue = {1e-4};
-	Vector_of_NonConstFunctionGenerator(Vh, Hfuncs, isconst, constvalue);
-
-	std::vector<std::shared_ptr<dolfin::GenericFunction>> Hconsts;//keeping all the constants for proton concentration in a vector
-	constvalue.clear(); constvalue.shrink_to_fit();
-	constvalue = {9.31e-9, 1};
-	Vector_of_ConstFunctionGenerator(Vh, Hconsts, constvalue);
-
 	//--Function generation intermediate variables are no longer needed--
 	isconst.clear(); isconst.shrink_to_fit();
 	constvalue.clear(); constvalue.shrink_to_fit();
@@ -151,7 +140,7 @@ int main(int argc,char ** args) {
 	//Nernst-Planck
 	//Common part
 	auto MCmatrix_np = std::make_shared<dolfin::PETScMatrix>(PETSC_COMM_WORLD);//matrix of respective weak formulation
-	Weak2Matrix(*MC_np, {}, *MCmatrix_np);
+	Weak2Matrix(*MC_np, {}, *MCmatrix_np);//Petsc requires a constructor for vectors and matrices
 	auto LinSysLhs_np = std::make_shared<dolfin::PETScMatrix>(*MCmatrix_np);
 	LinSysLhs_np->zero();
 	auto LinSysRhs_np = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));
@@ -175,7 +164,7 @@ int main(int argc,char ** args) {
 	double dt = 1e-1;
 	double dt_Adaptive = dt;
 	std::size_t StroringStep = 1;//every 1s
-	std::size_t SimulationTime = 12*3600;//unit is seconds
+	std::size_t SimulationTime = 5;//12*3600;//unit is seconds
 
 	PetscBarrier(NULL);
 
@@ -228,6 +217,7 @@ int main(int argc,char ** args) {
 
 	SolverWrapper_np->set_operator(*LinSysLhs_np);
 	SolverWrapper_np->solve(*Mgfuncs[1]->vector(), *LinSysRhs_np);
+	FunctionFilterAvg(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), *Vh, *mesh);
 	
 	//to apply adaptive time step
 	AFC_L_Compute(A0_Mg->mat(), G0_Mg->mat(), tmpmatrix_np->mat());
@@ -241,11 +231,18 @@ int main(int argc,char ** args) {
 	I0_OH->zero();
 	auto I1_OH = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));
 	I1_OH->zero();
-	auto RHOH = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));
-	RHOH->zero();
 
-	Ivector_np->operator*=((96487.3329*1.2e-2)/(2*96487.3329*2.76e-2));//we want two different multiplication on Al and Mg. Because currently on Al is 0 this way this coefficient neutralizes later
-	iOH(DOFsSetOnAlElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, t, dt, Ivector_np->vec());//This is the current of elctrons and change in OH- concentration is the same
+	//the current in Al is fixed and equal to average of the Mg electrode
+	PetscScalar DOFsNum = DOFsSetOnMgElectrode.size();
+	double iAl;
+	VecSum(Ivector_np->vec(), &iAl);
+	MPIU_Allreduce(MPI_IN_PLACE, &DOFsNum, 1, MPIU_REAL, MPIU_SUM, PETSC_COMM_WORLD);//number of dofs on all processors
+	iAl=(iAl/DOFsNum);
+
+	PetscBarrier(NULL);
+
+	Ivector_np->operator*=(1.2e-2/2.76e-2);//we want two different multiplication on Al and Mg. Because currently on Al is 0 this way this coefficient neutralizes later
+	iOH(DOFsSetOnAlElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, iAl, t, dt, Ivector_np->vec());//This is the current of elctrons and change in OH- concentration is the same
 
 	WeakAssign(*A_np, {"Di", "zi"}, OHconsts);// electric field has already assigned
 	WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np->operator*(1/(96487.3329*1.2e-2)))});//change in OH- concentration
@@ -273,66 +270,16 @@ int main(int argc,char ** args) {
 	//solve
 	SolverWrapper_np->set_operator(*LinSysLhs_np);
 	SolverWrapper_np->solve(*OHfuncs[1]->vector(), *LinSysRhs_np);
+	FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
 
 	//to apply adaptive time step
 	AFC_L_Compute(A0_OH->mat(), G0_OH->mat(), tmpmatrix_np->mat());
 	dt_Adaptive = std::min(dt_Adaptive, AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat()));
 
-	//H
-	auto A0_H = std::make_shared<dolfin::PETScMatrix>(*MCmatrix_np);
-	auto G0_H = std::make_shared<dolfin::PETScMatrix>(*MCmatrix_np);
-	auto G1_H = std::make_shared<dolfin::PETScMatrix>(*MCmatrix_np);
-	//H produced or consumed identical as OH
-
-	WeakAssign(*A_np, {"Di", "zi"}, Hconsts);// electric field has already assigned
-
-	PetscBarrier(NULL);
-
-	Weak2Matrix(*A_np, {}, *Amatrix_np);
-
-	PetscBarrier(NULL);
-
-	AFC_D_Compute(Amatrix_np->mat(), G1_H->mat());
-	MatCopy(Amatrix_np->mat(), A0_H->mat(), DIFFERENT_NONZERO_PATTERN);//At the begining A1_H=A0_H, we don't keep A1 independently but update the A0 at the end of calculations
-	MatCopy(G1_H->mat(), G0_H->mat(), DIFFERENT_NONZERO_PATTERN);//At the begining Gamma1_H=Gamma0_H
-
-	nonLinAFC_alpha_Compute(MLmatrix_np->mat(), MCmatrix_np->mat(), G1_H->mat(), G0_H->mat(), A0_H->mat(), as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), I0_OH->vec(), dt, tmpmatrix_np->mat(), alphamatrix_np->mat());//the matrix r is not applicable for non-Linear AFC //I0_H is identical to I0_OH
-
-	PetscBarrier(NULL);
-
-	//Construction of Linear system
-	nonLinAFC_LinSys_Construct(MLmatrix_np->mat(), MCmatrix_np->mat(), G1_H->mat(), G0_H->mat(), Amatrix_np->mat(), A0_H->mat(), alphamatrix_np->mat(), tmpmatrix_np->mat(), as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), I1_OH->vec(), I0_OH->vec(), dt, LinSysLhs_np->mat(), LinSysRhs_np->vec());//H produced or consumed identical as OH
-
-	//solve
-	SolverWrapper_np->set_operator(*LinSysLhs_np);
-	SolverWrapper_np->solve(*Hfuncs[1]->vector(), *LinSysRhs_np);
-
-	//to apply adaptive time step
-	AFC_L_Compute(A0_H->mat(), G0_H->mat(), tmpmatrix_np->mat());
-	dt_Adaptive = std::min(dt_Adaptive, AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat()));//at this point dt_Adaptive is the smallest CFD condition
-
-	PetscBarrier(NULL);
-
-	//Water dissociation determines the amount of hydro-ions to be produced or consumed for keeping balance
-	WaterDissociation(as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), RHOH->vec());
-
-	//electrode interface is exempt from water dissociation
-	VecSetOnLocalDOFs(DOFsSetOnAlElectrode, RHOH->vec(), 0);
-	VecSetOnLocalDOFs(DOFsSetOnMgElectrode, RHOH->vec(), 0);
-
-	//adding to the current solution
-	//VecAXPY(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), dt, RHOH->vec());
-	VecGhostUpdateBegin(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-	VecGhostUpdateEnd(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-	//VecAXPY(as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec(), dt, RHOH->vec());
-	VecGhostUpdateBegin(as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-	VecGhostUpdateEnd(as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-
 	//pH
 	auto pH = std::make_shared<dolfin::Function>(Vh);
-
 	pH_Compute(*OHfuncs[0], *pH, false);
-FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
+
 	//storing
 	auto StoringStream_p = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/Electric Field.pvd");
 	StoringStream_p->operator<<(*ElectricFieldfuncs[0]);	
@@ -342,9 +289,6 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 	auto StoringStream_OH = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/OH_Concentration.pvd");
 	StoringStream_OH->operator<<(*OHfuncs[0]);
 	StoringStream_OH->operator<<(*OHfuncs[1]);
-	auto StoringStream_H = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/H_Concentration.pvd");
-	StoringStream_H->operator<<(*Hfuncs[0]);
-	StoringStream_H->operator<<(*Hfuncs[1]);
 	auto StoringStream_pH = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/pH_Concentration.pvd");
 	StoringStream_pH->operator<<(*pH);
 	pH_Compute(*OHfuncs[1], *pH, false);
@@ -364,7 +308,6 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 	//Nernst-Planck
 	*(Mgfuncs[0]->vector()) = *(Mgfuncs[1]->vector());
 	*(OHfuncs[0]->vector()) = *(OHfuncs[1]->vector());
-	*(Hfuncs[0]->vector()) = *(Hfuncs[1]->vector());
 
 	VecCopy(I1_Mg->vec(), I0_Mg->vec());
 	VecCopy(I1_OH->vec(), I0_OH->vec());
@@ -401,13 +344,6 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 		std::cout<<"Min OH:"<<minval<<std::endl;
 		std::cout<<"Max OH:"<<maxval<<std::endl<<std::endl;
 	}
-	//H
-	minval = as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->min();
-	maxval = as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->max();
-	if(prcID==0) {
-		std::cout<<"Min H:"<<minval<<std::endl;
-		std::cout<<"Max H:"<<maxval<<std::endl<<std::endl;
-	}
 
 	while (t<=SimulationTime) {
 		Weak2Matrix(*a_p, DBC_p, *LinSysLhs_p, *LinSysRhs_p);
@@ -439,6 +375,7 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 
 		SolverWrapper_np->set_operator(*LinSysLhs_np);
 		SolverWrapper_np->solve(*Mgfuncs[1]->vector(), *LinSysRhs_np);
+		FunctionFilterAvg(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), *Vh, *mesh);
 
 		//to apply adaptive time step
 		AFC_L_Compute(A0_Mg->mat(), G0_Mg->mat(), tmpmatrix_np->mat());
@@ -448,8 +385,15 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 		MatCopy(Amatrix_np->mat(), A0_Mg->mat(), DIFFERENT_NONZERO_PATTERN);
 
 		//OH
-		Ivector_np->operator*=((96487.3329*1.2e-2)/(2*96487.3329*2.76e-2));//we want two different multiplication on Al and Mg. Because currently on Al is 0 this way this coefficient neutralizes later
-		iOH(DOFsSetOnAlElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, t, dt, Ivector_np->vec());
+		//the current in Al is fixed and equal to average of the Mg side
+		VecSum(Ivector_np->vec(), &iAl);
+		iAl=(iAl/DOFsNum);
+
+		//the current in Al is fixed and equal to average of the other side
+		VecSum(Ivector_np->vec(), &iAl);
+		iAl=(iAl/DOFsNum);
+		Ivector_np->operator*=(1.2e-2/2.76e-2);//we want two different multiplication on Al and Mg. Because currently on Al is 0 this way this coefficient neutralizes later
+		iOH(DOFsSetOnAlElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, iAl, t, dt, Ivector_np->vec());
 
 		WeakAssign(*A_np, {"Di", "zi"}, OHconsts);// electric field has already assigned
 		WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np->operator*(1/(96487.3329*1.2e-2)))});
@@ -472,6 +416,7 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 
 		SolverWrapper_np->set_operator(*LinSysLhs_np);
 		SolverWrapper_np->solve(*OHfuncs[1]->vector(), *LinSysRhs_np);
+		FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
 
 		//to apply adaptive time step
 		AFC_L_Compute(A0_OH->mat(), G0_OH->mat(), tmpmatrix_np->mat());
@@ -480,51 +425,6 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 		//updating A0
 		MatCopy(Amatrix_np->mat(), A0_OH->mat(), DIFFERENT_NONZERO_PATTERN);
 
-		//H
-		WeakAssign(*A_np, {"Di", "zi"}, Hconsts);// electric field has already assigned
-
-		PetscBarrier(NULL);
-
-		Weak2Matrix(*A_np, {}, *Amatrix_np);
-
-		PetscBarrier(NULL);
-
-		AFC_D_Compute(Amatrix_np->mat(), G1_H->mat());
-
-		nonLinAFC_alpha_Compute(MLmatrix_np->mat(), MCmatrix_np->mat(), G1_H->mat(), G0_H->mat(), A0_H->mat(), as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), I0_OH->vec(), dt, tmpmatrix_np->mat(), alphamatrix_np->mat());//the matrix r is not applicable for non-Linear AFC //I0_H is identical to I0_OH
-
-		PetscBarrier(NULL);
-
-		//Construction of Linear system
-		nonLinAFC_LinSys_Construct(MLmatrix_np->mat(), MCmatrix_np->mat(), G1_H->mat(), G0_H->mat(), Amatrix_np->mat(), A0_H->mat(), alphamatrix_np->mat(), tmpmatrix_np->mat(), as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), I1_OH->vec(), I0_OH->vec(), dt, LinSysLhs_np->mat(), LinSysRhs_np->vec());//H produced or consumed identical as OH
-
-		SolverWrapper_np->set_operator(*LinSysLhs_np);
-		SolverWrapper_np->solve(*Hfuncs[1]->vector(), *LinSysRhs_np);
-
-		//to apply adaptive time step
-		AFC_L_Compute(A0_H->mat(), G0_H->mat(), tmpmatrix_np->mat());
-		dt_Adaptive = std::min(dt_Adaptive, AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat()));//at this point dt_Adaptive is the smallest CFD condition
-
-		//updating A0
-		MatCopy(Amatrix_np->mat(), A0_H->mat(), DIFFERENT_NONZERO_PATTERN);
-
-		PetscBarrier(NULL);
-
-		//Water dissociation determines the amount of hydro-ions to be produced or consumed for keeping balance
-		WaterDissociation(as_type<const dolfin::PETScVector>(Hfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), RHOH->vec());
-
-		//electrode interface is exempt from water dissociation
-		VecSetOnLocalDOFs(DOFsSetOnAlElectrode, RHOH->vec(), 0);
-		VecSetOnLocalDOFs(DOFsSetOnMgElectrode, RHOH->vec(), 0);
-
-		//adding to the current solution
-		//VecAXPY(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), dt, RHOH->vec());
-		VecGhostUpdateBegin(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-		VecGhostUpdateEnd(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-		//VecAXPY(as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec(), dt, RHOH->vec());
-		VecGhostUpdateBegin(as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-		VecGhostUpdateEnd(as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->vec(), INSERT_VALUES, SCATTER_FORWARD);
-
 		//pH
 		if (std::fmod(std::floor(t),StroringStep) == 0.0) {//compute pH and storing data every StroringStep seconds
 			pH_Compute(*OHfuncs[1], *pH, false);
@@ -532,7 +432,6 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 			StoringStream_p->operator<<(*ElectricFieldfuncs[0]);	
 			StoringStream_Mg->operator<<(*Mgfuncs[1]);
 			StoringStream_OH->operator<<(*OHfuncs[1]);
-			StoringStream_H->operator<<(*Hfuncs[1]);
 			StoringStream_pH->operator<<(*pH);
 			StoringStream_theta->operator<<(*std::make_shared<dolfin::Function>(Vh, theta));
 			StoringStream_epsln->operator<<(*std::make_shared<dolfin::Function>(Vh, epsln));
@@ -547,14 +446,12 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 		//Nernst-Planck
 		*(Mgfuncs[0]->vector()) = *(Mgfuncs[1]->vector());
 		*(OHfuncs[0]->vector()) = *(OHfuncs[1]->vector());
-		*(Hfuncs[0]->vector()) = *(Hfuncs[1]->vector());
 
 		VecCopy(I1_Mg->vec(), I0_Mg->vec());
 		VecCopy(I1_OH->vec(), I0_OH->vec());
 
 		MatCopy(G1_Mg->mat(), G0_Mg->mat(), DIFFERENT_NONZERO_PATTERN);
 		MatCopy(G1_OH->mat(), G0_OH->mat(), DIFFERENT_NONZERO_PATTERN);
-		MatCopy(G1_H->mat(), G0_H->mat(), DIFFERENT_NONZERO_PATTERN);
 
 		//time
 		t = dt + t;
@@ -596,85 +493,53 @@ FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(
 			std::cout<<"Min OH:"<<minval<<std::endl;
 			std::cout<<"Max OH:"<<maxval<<std::endl<<std::endl;
 		}
-		//H
-		minval = as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->min();
-		maxval = as_type<const dolfin::PETScVector>(Hfuncs[1]->vector())->max();
-		if(prcID==0) {
-			std::cout<<"Min H:"<<minval<<std::endl;
-			std::cout<<"Max H:"<<maxval<<std::endl<<std::endl;
-		}
 
 		PetscBarrier(NULL);
-getc(stdin);
+//getc(stdin);//stop command
 	}
 
 	if(prcID==0) {
 		time(&end);
 		std::cout<<"total exc time: "<<double(end-start)<<std::endl;
 	}
-/***here***/
+
 	PetscBarrier(NULL);
 
-	/*//memory release in chronological order
+	//memory release in chronological order
 	//weak forms
-	a.reset();L.reset();MC.reset();A.reset();f.reset();
+	a_p.reset();MC_np.reset();A_np.reset();I_np.reset();
 
 	//vectors
-	DBCs.clear(); DBCs.shrink_to_fit();
-	PhiPolData.clear();
-	PhiPolData.shrink_to_fit();
-	MgPolData.clear();
-	MgPolData.shrink_to_fit();
-	AlPolData.clear();
-	AlPolData.shrink_to_fit();
-	DOFsSetOnAlElectrode.clear();
-	DOFsSetOnAlElectrode.shrink_to_fit();
-	DOFsSetOnMgElectrode.clear();
-	DOFsSetOnMgElectrode.shrink_to_fit();
+	DBC_p.clear(); DBC_p.shrink_to_fit();
+	DOFsSetOnAlElectrode.clear();DOFsSetOnAlElectrode.shrink_to_fit();
+	DOFsSetOnMgElectrode.clear();DOFsSetOnMgElectrode.shrink_to_fit();
 
 	//shared functions or vector of shared functions
-	zerofunc.reset();
-	SharedTypeVectorDestructor(EFfuncs);
-	pH.reset();
+	SharedTypeVectorDestructor(ElectricFieldfuncs);
 	SharedTypeVectorDestructor(Mgfuncs);SharedTypeVectorDestructor(Mgconsts);
 	SharedTypeVectorDestructor(OHfuncs);SharedTypeVectorDestructor(OHconsts);
-	SharedTypeVectorDestructor(Hfuncs);SharedTypeVectorDestructor(Hconsts);
+	pH.reset();
 
 	//mesh and function space
 	Vh.reset();mesh.reset();
 
-	//shared matrices
-	A_P.reset();
-	A_ML.reset();A_MC.reset();A_NP.reset();rij.reset();ALinSys.reset();rhsLinSys.reset();
-	L0_Mg.reset();D0_Mg.reset();D1_Mg.reset();
-	L0_OH.reset();D0_OH.reset();D1_OH.reset();
-	L0_H.reset();D0_H.reset();D1_H.reset();
-
-	//shared vectors
-	b_P.reset();BoundaryPhi.reset();
-	Ii.reset();fStar.reset();bLinSys.reset();Vec_l.reset();Vec_teta.reset();Vec_eps.reset();
-	b0_Mg.reset();b1_Mg.reset();
-	b0_OH.reset();b1_OH.reset();RHOH.reset();
-	//b0_H.reset();b1_H.reset();
+	//shared matrices and vectors
+	LinSysLhs_p.reset();LinSysRhs_p.reset();Phibar.reset();
+	MCmatrix_np.reset();LinSysLhs_np.reset();LinSysRhs_np.reset();tmpmatrix_np.reset();MLmatrix_np.reset();Amatrix_np.reset();Ivector_np.reset();alphamatrix_np.reset();theta.reset();epsln.reset();ldep.reset();
+	A0_Mg.reset();G0_Mg.reset();G1_Mg.reset();I0_Mg.reset();I1_Mg.reset();
+	A0_OH.reset();G0_OH.reset();G1_OH.reset();I0_OH.reset();I1_OH.reset();
 
 	//shared solvers
-	PSolver.reset();
-	NPSolver.reset();
+	Solver_p.reset();
+	SolverWrapper_np.reset();
 
 	//petsc solvers
-	//KSPDestroy(&myNPSolver); //NPSolver seems to take the exact pointer and destruct it on reset
-	PCDestroy(&myNPConditioner);
+	KSPDestroy(&Solver_np);
+	PCDestroy(&Conditioner_np);
 
 	//shared file streams
-	ff_P.reset();
-	ff_Mg.reset();
-	ff_OH.reset();
-	ff_H.reset();
-	ff_pH.reset();
-	ff_l.reset();
-	ff_teta.reset();
-	ff_eps.reset();*/
-
+	StoringStream_p.reset();StoringStream_Mg.reset();StoringStream_OH.reset();StoringStream_pH.reset();StoringStream_theta.reset();StoringStream_epsln.reset();StoringStream_ldep.reset();
+std::cout<<"breakout "<<prcID<<std::endl;
 	PetscFinalize();
 
 	return 0;

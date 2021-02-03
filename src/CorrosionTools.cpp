@@ -180,16 +180,14 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, Vec cMg, Vec cOH , Vec 
 
 //Doi: 10.1149/2.0071501jes
 //EQ[11], EQ[13]
-int iOH(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, Vec cMg, Vec cOH , Vec Vec_teta,  Vec Vec_eps, Vec Vec_l, double teta0, double eps0, double t, double dt, Vec Ii) {
-	//Input: Dofset on boundary, Phibar, cMg, cOH, teta,, eps l, teta0, eps0, t, dt
+int iOH(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, Vec cMg, Vec cOH , Vec Vec_teta,  Vec Vec_eps, Vec Vec_l, double teta0, double eps0, double iAl, double t, double dt, Vec Ii) {
+	//Input: Dofset on boundary, Phibar, cMg, cOH, teta,, eps l, teta0, eps0, iAl, t, dt
 	//Output: Ii
-
-	VecScale(Ii, 2);
 
 	PetscScalar eps;
 	PetscScalar l;
 	PetscScalar teta;
-	PetscScalar iElectrode;
+	PetscScalar iElectrode = iAl;
 	PetscScalar UElectrode;
 
 	const PetscScalar* cMg_i;
@@ -207,11 +205,10 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, Vec cMg, Vec cOH , Vec 
 		eps = epsODE(cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]], eps0, t+dt);
 		l = l_i[LocalDOFSet_bar[j]] + uDep(cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]], eps)*dt;//previous value + new value of l based on online other values = present value
 		teta = tetaODE(cMg_i[LocalDOFSet_bar[j]], cOH_i[LocalDOFSet_bar[j]], eps, l, teta0, t+dt);
-		iElectrode = std::sqrt(teta)*0.5127;//iElectrodeFormula(teta, eps) *the simpler formula has directly applied*
-		VecSetValueLocal(Ii, LocalDOFSet_bar[j], iElectrode, INSERT_VALUES);
+		VecSetValueLocal(Ii, LocalDOFSet_bar[j], iElectrode, INSERT_VALUES);//the average current of Mg electrode is applied uniformly here (note theta and epsilon describing only the Mg dynamics)
 		//extracting dirichlet condition for electric field
 		//phi_Mg(here UElectrode) computation
-		UElectrode = ((-1.463+0.595)/(-std::log(std::sqrt(teta0)))) * std::log(std::sqrt(teta/teta0)) - 0.595;//alternative is Current2ElectricField(PolarizationData, Polarizationcurrents, iElectrode) *the simpler approach is to use formula and not experimental polarization data*
+		UElectrode = ((-1.463+0.595)/(-std::log(std::sqrt(teta0))))*std::log(std::sqrt(iAl/(teta0*0.5127))) - 0.595;//alternative is Current2ElectricField(PolarizationData, Polarizationcurrents, iElectrode) *the simpler approach is to use formula and not experimental polarization data*
 		VecSetValueLocal(Phibar, LocalDOFSet_bar[j], UElectrode, INSERT_VALUES);
 		VecSetValueLocal(Vec_l, LocalDOFSet_bar[j], l, INSERT_VALUES);
 		VecSetValueLocal(Vec_teta, LocalDOFSet_bar[j], teta, INSERT_VALUES);
@@ -260,17 +257,16 @@ int WaterDissociation(Vec cH, Vec cOH, Vec Reaction) {
 
 	Vec vtmp;
 	VecDuplicate(cH, &vtmp);
-	VecSet(vtmp, 1e-20);
+	VecSet(vtmp, 1e-15);
 
 	VecPointwiseMax(cH, cH, vtmp);// negative concentrations set to almost zero
 	VecPointwiseMax(cOH, cOH, vtmp);// negative concentrations set to almost zero
 
 	//EQ[5]
-	VecSet(Reaction, 1.008e-8);//Kw
+	VecSet(Reaction, 1.0e-8);//Kw
 	VecPointwiseMult(vtmp, cH, cOH);//[cH][cOH]
 	VecAXPY(Reaction, -1, vtmp);//Kw-[cH][cOH]
-	VecSet(vtmp, 1.4e8);//kb
-	VecPointwiseMult(Reaction, Reaction, vtmp);//kb(Kw-[cH][cOH])
+	VecScale(Reaction, 1.4e4);//1e-4*kb(Kw-[cH][cOH])
 
 	PetscBarrier(NULL);
 
@@ -332,11 +328,11 @@ int pH_Compute(dolfin::Function func, dolfin::Function &pH, bool Hbased=true) {
 	for (PetscInt j = 0; j < lsize; j = j + 1) {
 		if (Hbased) {
 			if (PetscIsNormalReal(-1*std::log10(1e-3*c_i[j])))
-				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, -1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
+				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, -1*std::log10(1e-3*c_i[j]), INSERT_VALUES);//1e-3 for converting mol/m3 to mol/L
 		}
 		else {
 			if (PetscIsNormalReal(14+1*std::log10(1e-3*c_i[j])))
-				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, 14+1*std::log10(1e-3*c_i[j]), INSERT_VALUES);
+				VecSetValueLocal(as_type<const dolfin::PETScVector>(pH.vector())->vec(), j, 14+1*std::log10(1e-3*c_i[j]), INSERT_VALUES);//1e-3 for converting mol/m3 to mol/L and pOH approx 14-pH
 		}
 	}
 

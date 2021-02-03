@@ -171,6 +171,11 @@ double AFC_dt_Compute(Mat ML, Mat Lk) {
 	//round off time step
 	if(dt>1e-3)
 		dt = std::floor(1e3*dt)/1e3;
+		
+	PetscBarrier(NULL);
+
+	VecDestroy(&vtmp1);
+	VecDestroy(&vtmp2);
 
 	return dt;
 }
@@ -523,7 +528,7 @@ int nonLinAFC_alpha_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat A0, Vec c0, Vec 
 
 	MatGetOwnershipRange(A0, &A0_FromRow, &A0_ToRow);
 
-	Vec Rp, Rn;
+	Vec Rp, Rn, vtmp_SEQ;
 	VecDuplicate(c0_SEQ, &Rp);
 	VecSet(Rp, 1);
 	VecDuplicate(c0_SEQ, &Rn);
@@ -678,19 +683,21 @@ int nonLinAFC_alpha_Compute(Mat ML, Mat MC, Mat D1, Mat D0, Mat A0, Vec c0, Vec 
 	VecDestroy(&c_tilde_SEQ);
 
 	//insurance that R+ and R- are in [0,1]
-	VecDuplicate(Rp, &vtmp);
-	VecSet(vtmp, 0);
-	VecPointwiseMax(Rp, Rp, vtmp);
-	VecPointwiseMax(Rn, Rn, vtmp);
-	VecSet(vtmp, 1);
-	VecPointwiseMin(Rp, Rp, vtmp);
-	VecPointwiseMin(Rn, Rn, vtmp);
+	VecDuplicate(Rp, &vtmp_SEQ);
+	VecSet(vtmp_SEQ, 0);
+	VecPointwiseMax(Rp, Rp, vtmp_SEQ);
+	VecPointwiseMax(Rn, Rn, vtmp_SEQ);
+	VecSet(vtmp_SEQ, 1);
+	VecPointwiseMin(Rp, Rp, vtmp_SEQ);
+	VecPointwiseMin(Rn, Rn, vtmp_SEQ);
 	VecGhostUpdateBegin(Rp, INSERT_VALUES, SCATTER_FORWARD);
 	VecGhostUpdateEnd(Rp, INSERT_VALUES, SCATTER_FORWARD);
 	VecGhostUpdateBegin(Rn, INSERT_VALUES, SCATTER_FORWARD);
 	VecGhostUpdateEnd(Rn, INSERT_VALUES, SCATTER_FORWARD);
 
 	PetscBarrier(NULL);
+
+	VecDestroy(&vtmp_SEQ);
 
 	// Zalesak's algorithm
 	// Based on the last line of (8) alpha is computed from R+,R- and r(in our paper beta_tilde)
