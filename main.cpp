@@ -385,10 +385,6 @@ int main(int argc,char ** args) {
 		MatCopy(Amatrix_np->mat(), A0_Mg->mat(), DIFFERENT_NONZERO_PATTERN);
 
 		//OH
-		//the current in Al is fixed and equal to average of the Mg side
-		VecSum(Ivector_np->vec(), &iAl);
-		iAl=(iAl/DOFsNum);
-
 		//the current in Al is fixed and equal to average of the other side
 		VecSum(Ivector_np->vec(), &iAl);
 		iAl=(iAl/DOFsNum);
