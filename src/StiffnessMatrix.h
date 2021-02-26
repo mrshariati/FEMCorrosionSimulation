@@ -3166,7 +3166,7 @@ return enabled;
     sp[5] = w0_d1 * sp[3];
     sp[6] = w0_d0 * sp[4];
     sp[7] = sp[5] + sp[6];
-    sp[8] = sp[7] * (39.3179 * w[2][0]);
+    sp[8] = sp[7] * (39.318 * w[2][0]);
     sp[9] = sp[3] * sp[3];
     sp[10] = sp[3] * sp[4];
     sp[11] = sp[4] * sp[4];
@@ -3177,7 +3177,7 @@ return enabled;
     sp[16] = w0_d0 * sp[14];
     sp[17] = w0_d1 * sp[15];
     sp[18] = sp[16] + sp[17];
-    sp[19] = sp[18] * (39.3179 * w[2][0]);
+    sp[19] = sp[18] * (39.318 * w[2][0]);
     sp[20] = sp[15] * sp[15];
     sp[21] = sp[14] * sp[15];
     sp[22] = sp[14] * sp[14];
@@ -3296,7 +3296,7 @@ return enabled;
         for (int ic = 0; ic < 3; ++ic)
             w0 += w[0][ic] * FE3_C0_F_Q2[facet][iq][ic];
         alignas(32) double sv2[1];
-        sv2[0] = -1 * w0 * sp[9];
+        sv2[0] = sp[9] * w0;
         const double fw0 = sv2[0] * weights2[iq];
         for (int i = 0; i < 3; ++i)
             BF0[i] += fw0 * FE3_C0_F_Q2[facet][iq][i];
@@ -3325,7 +3325,7 @@ public:
 
   const char * signature() const final override
   {
-    return "e5bbd44b2fb1bf6dbcdaa44a8af1b00a971402bfcff55c30cb3cbcd142b1786580c67090f984aac18bd6dd0537d2aa7868499b6bb95024e4780960d0d8c4a901";
+    return "c198ef4452786a518a8f7a5f80a63b6c5019fbbd0a23c098ae656043e747375ad8f03cb75407d3e04c975d51be340968a741bf39405bcfe10e31e55ce627a8a0";
   }
 
   std::size_t rank() const final override
@@ -3580,7 +3580,7 @@ public:
 
   const char * signature() const final override
   {
-    return "430121f064731d9b983219a6493f9a8144bebcf46db0c717d4326132947e814bcce40a4c61f6aedbe353382a4f0ec3d3f092568b933ea1415ee28ba91c1e5c14";
+    return "9aac1262c33b3a91aee4fc7c03f5b3044cd7fbcfdf4100ff338e0c6f9ad5bac8c5b9effc16cd8e8ac65e05d73592b3a4cfd988d069a73de7a8a6b463ae84b55d";
   }
 
   std::size_t rank() const final override

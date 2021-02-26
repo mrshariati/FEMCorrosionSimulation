@@ -25,20 +25,21 @@ int main(int argc,char ** args) {
 	//----The points that are needed in a corrosion rectangle model----
 	std::vector<dolfin::Point> p_d;//_d stands for domain
 
-	RectPointsGenerator(0.04, 0.5, p_d);
-	p_d.push_back(p_d[0] + (p_d[3]-p_d[0])*0.3 + (p_d[3]-p_d[0])*0.01);
-	p_d.push_back(p_d[0] + (p_d[3]-p_d[0])*0.3);
+	RectPointsGenerator(0.01, 0.02, p_d);//RectPointsGenerator(1, 2, ps);
+	p_d.push_back(p_d[0] + (p_d[3]-p_d[0])*0.3 + (p_d[3]-p_d[0])*0.02);
+	p_d.push_back(p_d[0] + (p_d[3]-p_d[0])*0.3 - (p_d[3]-p_d[0])*0.02);
+	double l_Al = 0.56e-2, l_Mg = 1.36e-2;
 
 	//----Reading the rectangle mesh from points and specifying the boundaries----
-	auto mesh = std::make_shared<dolfin::Mesh>(PETSC_COMM_WORLD, "mesh/Gapmesh.xml");
+	auto mesh = std::make_shared<dolfin::Mesh>(PETSC_COMM_WORLD, "mesh/mesh.xml");
 
 	std::vector<std::shared_ptr<dolfin::SubDomain>> b_d;//boundaries of domain
 	b_d.push_back(std::make_shared<RectBorderLine>(p_d[0], p_d[1]));
 	b_d.push_back(std::make_shared<RectBorderLine>(p_d[1], p_d[2]));
 	b_d.push_back(std::make_shared<RectBorderLine>(p_d[2], p_d[3]));
-	b_d.push_back(std::make_shared<RectBorderLine>(p_d[3], p_d[4]));
-	b_d.push_back(std::make_shared<RectBorderLine>(p_d[5], p_d[0]));
-	b_d.push_back(std::make_shared<RectBorderLine>(p_d[4], p_d[5]));//only valid for Gapmesh
+	b_d.push_back(std::make_shared<RectBorderLine>(p_d[3], p_d[4]));//Mg
+	b_d.push_back(std::make_shared<RectBorderLine>(p_d[5], p_d[0]));//Al
+	b_d.push_back(std::make_shared<RectBorderLine>(p_d[4], p_d[5]));//Insulator
 
 	PetscBarrier(NULL);
 
@@ -92,7 +93,7 @@ int main(int argc,char ** args) {
 
 	//----Deciesion on type and assignment of the boudaries (Neumann, Dirichlet, ...)----
 	std::vector<dolfin::DirichletBC> DBC_p;//DBC stands for Dirichlet Boundary Condition
-	myDirichletBCGenerator(Vh, {std::make_shared<dolfin::Constant>(-1.517), std::make_shared<dolfin::Constant>(-0.595)}, {b_d[3], b_d[4]}, DBC_p);//to assign values to a specific domain boundary
+	myDirichletBCGenerator(Vh, {std::make_shared<dolfin::Constant>(-1.763), std::make_shared<dolfin::Constant>(-1.163)}, {b_d[3], b_d[4]}, DBC_p);//to assign values to a specific domain boundary
 
 	std::vector<std::size_t> NodesOnAlElectrode;
 	std::vector<std::size_t> NodesOnMgElectrode;
@@ -156,15 +157,17 @@ int main(int argc,char ** args) {
 	theta->zero();
 	auto epsln = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));//porosity
 	epsln->zero();
-	auto ldep = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));//deposit layer thickness
-	ldep->zero();
-	ldep->operator=(1e-7);//l0_dep
+	auto l_dep = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));//deposit layer thickness
+	l_dep->zero();
+	l_dep->operator=(0);//l0_dep
 
+	double theta0 = 0.1, eps0 = 0.55, l_dep0 = 1e-7, l_max = 1e-3, i_eq = 0.5127, phi_eq = -1.463, phi_Al = -1.163, phi_Mg = -1.763;//fixed model constants
+	double sqrt_theta_bar;
 	double t = 0;
-	double dt = 1e-1;
+	double dt = 1e-2;
 	double dt_Adaptive = dt;
-	std::size_t StroringStep = 1;//every 1s
-	std::size_t SimulationTime = 5;//12*3600;//unit is seconds
+	double scount = 60, hcount = 3600;
+	std::size_t SimulationTime = 12*3600;//unit is seconds
 
 	PetscBarrier(NULL);
 
@@ -179,10 +182,10 @@ int main(int argc,char ** args) {
 	auto I1_Mg = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));
 	I1_Mg->zero();
 
-	iMg(DOFsSetOnMgElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, t, dt, Ivector_np->vec());//This is the current of elctrons and change in Mg2+ concentration is half of it
+	iMg(DOFsSetOnMgElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), l_dep->vec(), theta0, eps0, l_dep0, l_max, i_eq, phi_eq, phi_Mg, t, Ivector_np->vec(), sqrt_theta_bar);
 
 	WeakAssign(*A_np, {"Di", "zi","phi"}, {Mgconsts[0], Mgconsts[1], ElectricFieldfuncs[0]});
-	WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np->operator*(1/(2*96487.3329*2.76e-2)))});//change in Mg2+ concentration
+	WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np)});//change in Mg2+ concentration
 
 	PetscBarrier(NULL);
 
@@ -217,11 +220,11 @@ int main(int argc,char ** args) {
 
 	SolverWrapper_np->set_operator(*LinSysLhs_np);
 	SolverWrapper_np->solve(*Mgfuncs[1]->vector(), *LinSysRhs_np);
-	FunctionFilterAvg(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), *Vh, *mesh);
+	//FunctionNFilterMin(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), *Vh, *mesh);
 	
 	//to apply adaptive time step
 	AFC_L_Compute(A0_Mg->mat(), G0_Mg->mat(), tmpmatrix_np->mat());
-	dt_Adaptive = 0.05*AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat());
+	dt_Adaptive = AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat());
 
 	//OH
 	auto A0_OH = std::make_shared<dolfin::PETScMatrix>(*MCmatrix_np);
@@ -232,20 +235,14 @@ int main(int argc,char ** args) {
 	auto I1_OH = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));
 	I1_OH->zero();
 
-	//the current in Al is fixed and equal to average of the Mg electrode
-	PetscScalar DOFsNum = DOFsSetOnMgElectrode.size();
-	double iAl;
-	VecSum(Ivector_np->vec(), &iAl);
-	MPIU_Allreduce(MPI_IN_PLACE, &DOFsNum, 1, MPIU_REAL, MPIU_SUM, PETSC_COMM_WORLD);//number of dofs on all processors
-	iAl=(iAl/DOFsNum);
+	VecScale(Ivector_np->vec(), 2);//Mg->2OH
 
 	PetscBarrier(NULL);
 
-	Ivector_np->operator*=(1.2e-2/2.76e-2);//we want two different multiplication on Al and Mg. Because currently on Al is 0 this way this coefficient neutralizes later
-	iOH(DOFsSetOnAlElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, iAl, t, dt, Ivector_np->vec());//This is the current of elctrons and change in OH- concentration is the same
+	iOH(DOFsSetOnAlElectrode, Phibar->vec(), l_Al, l_Mg, sqrt_theta_bar, i_eq, phi_eq, phi_Al, t, Ivector_np->vec());
 
 	WeakAssign(*A_np, {"Di", "zi"}, OHconsts);// electric field has already assigned
-	WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np->operator*(1/(96487.3329*1.2e-2)))});//change in OH- concentration
+	WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np)});//change in OH- concentration
 
 	PetscBarrier(NULL);
 
@@ -270,7 +267,7 @@ int main(int argc,char ** args) {
 	//solve
 	SolverWrapper_np->set_operator(*LinSysLhs_np);
 	SolverWrapper_np->solve(*OHfuncs[1]->vector(), *LinSysRhs_np);
-	FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
+	//FunctionNFilterMin(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
 
 	//to apply adaptive time step
 	AFC_L_Compute(A0_OH->mat(), G0_OH->mat(), tmpmatrix_np->mat());
@@ -285,20 +282,16 @@ int main(int argc,char ** args) {
 	StoringStream_p->operator<<(*ElectricFieldfuncs[0]);	
 	auto StoringStream_Mg = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/Mg_Concentration.pvd");
 	StoringStream_Mg->operator<<(*Mgfuncs[0]);
-	StoringStream_Mg->operator<<(*Mgfuncs[1]);
 	auto StoringStream_OH = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/OH_Concentration.pvd");
 	StoringStream_OH->operator<<(*OHfuncs[0]);
-	StoringStream_OH->operator<<(*OHfuncs[1]);
 	auto StoringStream_pH = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/pH_Concentration.pvd");
-	StoringStream_pH->operator<<(*pH);
-	pH_Compute(*OHfuncs[1], *pH, false);
 	StoringStream_pH->operator<<(*pH);
 	auto StoringStream_theta = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/theta.pvd");
 	StoringStream_theta->operator<<(*std::make_shared<dolfin::Function>(Vh, theta));
 	auto StoringStream_epsln = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/epsln.pvd");
 	StoringStream_epsln->operator<<(*std::make_shared<dolfin::Function>(Vh, epsln));
-	auto StoringStream_ldep = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/ldep.pvd");
-	StoringStream_ldep->operator<<(*std::make_shared<dolfin::Function>(Vh, ldep));
+	auto StoringStream_l_dep = std::make_shared<dolfin::File>(PETSC_COMM_WORLD, "Results/l_dep.pvd");
+	StoringStream_l_dep->operator<<(*std::make_shared<dolfin::Function>(Vh, l_dep));
 
 	//updating
 	//poisson boundary (polarization on electrode interface)
@@ -317,7 +310,9 @@ int main(int argc,char ** args) {
 	if(prcID==0) {
 		std::cout<<"Time step dt: "<<dt<<std::endl;
 	}
-	dt = dt_Adaptive;
+	if (dt_Adaptive<10) {
+		dt = dt_Adaptive;
+	}
 
 	//Printing
 	//Poisson
@@ -354,10 +349,10 @@ int main(int argc,char ** args) {
 		Solver_p->solve(*ElectricFieldfuncs[0]->vector(), *LinSysRhs_p);
 
 		//Mg
-		iMg(DOFsSetOnMgElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, t, dt, Ivector_np->vec());
+		iMg(DOFsSetOnMgElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), l_dep->vec(), theta0, eps0, l_dep0, l_max, i_eq, phi_eq, phi_Mg, t, Ivector_np->vec(), sqrt_theta_bar);
 
 		WeakAssign(*A_np, {"Di", "zi","phi"}, {Mgconsts[0], Mgconsts[1], ElectricFieldfuncs[0]});
-		WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np->operator*(1/(2*96487.3329*2.76e-2)))});
+		WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np)});
 
 		PetscBarrier(NULL);
 
@@ -375,24 +370,24 @@ int main(int argc,char ** args) {
 
 		SolverWrapper_np->set_operator(*LinSysLhs_np);
 		SolverWrapper_np->solve(*Mgfuncs[1]->vector(), *LinSysRhs_np);
-		FunctionFilterAvg(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), *Vh, *mesh);
+		//FunctionNFilterMin(as_type<const dolfin::PETScVector>(Mgfuncs[1]->vector())->vec(), *Vh, *mesh);
 
 		//to apply adaptive time step
 		AFC_L_Compute(A0_Mg->mat(), G0_Mg->mat(), tmpmatrix_np->mat());
-		dt_Adaptive = 0.05*AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat());
+		dt_Adaptive = AFC_dt_Compute(MLmatrix_np->mat(), tmpmatrix_np->mat());
 
 		//updating A0
 		MatCopy(Amatrix_np->mat(), A0_Mg->mat(), DIFFERENT_NONZERO_PATTERN);
 
 		//OH
-		//the current in Al is fixed and equal to average of the other side
-		VecSum(Ivector_np->vec(), &iAl);
-		iAl=(iAl/DOFsNum);
-		Ivector_np->operator*=(1.2e-2/2.76e-2);//we want two different multiplication on Al and Mg. Because currently on Al is 0 this way this coefficient neutralizes later
-		iOH(DOFsSetOnAlElectrode, Phibar->vec(), as_type<const dolfin::PETScVector>(Mgfuncs[0]->vector())->vec(), as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())->vec(), theta->vec(), epsln->vec(), ldep->vec(), 0.4, 0.55, iAl, t, dt, Ivector_np->vec());
+		VecScale(Ivector_np->vec(), 2);//Mg->2OH
+
+		PetscBarrier(NULL);
+
+		iOH(DOFsSetOnAlElectrode, Phibar->vec(), l_Al, l_Mg, sqrt_theta_bar, i_eq, phi_eq, phi_Al, t, Ivector_np->vec());
 
 		WeakAssign(*A_np, {"Di", "zi"}, OHconsts);// electric field has already assigned
-		WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np->operator*(1/(96487.3329*1.2e-2)))});
+		WeakAssign(*I_np, {"Ii"}, {std::make_shared<dolfin::Function>(Vh, Ivector_np)});
 
 		PetscBarrier(NULL);
 
@@ -412,7 +407,7 @@ int main(int argc,char ** args) {
 
 		SolverWrapper_np->set_operator(*LinSysLhs_np);
 		SolverWrapper_np->solve(*OHfuncs[1]->vector(), *LinSysRhs_np);
-		FunctionFilterAvg(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
+		//FunctionNFilterMin(as_type<const dolfin::PETScVector>(OHfuncs[1]->vector())->vec(), *Vh, *mesh);
 
 		//to apply adaptive time step
 		AFC_L_Compute(A0_OH->mat(), G0_OH->mat(), tmpmatrix_np->mat());
@@ -422,7 +417,7 @@ int main(int argc,char ** args) {
 		MatCopy(Amatrix_np->mat(), A0_OH->mat(), DIFFERENT_NONZERO_PATTERN);
 
 		//pH
-		if (std::fmod(std::floor(t),StroringStep) == 0.0) {//compute pH and storing data every StroringStep seconds
+		if ((std::abs(t-scount) <= dt)) {//compute pH and storing data after scount seconds
 			pH_Compute(*OHfuncs[1], *pH, false);
 			//storing
 			StoringStream_p->operator<<(*ElectricFieldfuncs[0]);	
@@ -431,7 +426,14 @@ int main(int argc,char ** args) {
 			StoringStream_pH->operator<<(*pH);
 			StoringStream_theta->operator<<(*std::make_shared<dolfin::Function>(Vh, theta));
 			StoringStream_epsln->operator<<(*std::make_shared<dolfin::Function>(Vh, epsln));
-			StoringStream_ldep->operator<<(*std::make_shared<dolfin::Function>(Vh, ldep));
+			StoringStream_l_dep->operator<<(*std::make_shared<dolfin::Function>(Vh, l_dep));
+			if (t<=11+dt) {
+				scount = scount + 600;
+			}
+			else{
+				scount = hcount;
+				hcount = hcount + 3600;
+			}
 		}
 
 		//updating
@@ -454,14 +456,8 @@ int main(int argc,char ** args) {
 		if(prcID==0) {
 			std::cout<<"Time step dt: "<<dt<<std::endl;
 		}
-		dt = dt_Adaptive;
-		
-		//storage step
-		if (t > (10*60)) {//10 minutes
-			StroringStep = 10;//seconds
-		}
-		if (t > (60*60)) {//1 hour
-			StroringStep = 5*60;//seconds
+		if (dt_Adaptive<10) {
+			dt = dt_Adaptive;
 		}
 
 		//Printing
@@ -491,7 +487,6 @@ int main(int argc,char ** args) {
 		}
 
 		PetscBarrier(NULL);
-//getc(stdin);//stop command
 	}
 
 	if(prcID==0) {
@@ -521,7 +516,7 @@ int main(int argc,char ** args) {
 
 	//shared matrices and vectors
 	LinSysLhs_p.reset();LinSysRhs_p.reset();Phibar.reset();
-	MCmatrix_np.reset();LinSysLhs_np.reset();LinSysRhs_np.reset();tmpmatrix_np.reset();MLmatrix_np.reset();Amatrix_np.reset();Ivector_np.reset();alphamatrix_np.reset();theta.reset();epsln.reset();ldep.reset();
+	MCmatrix_np.reset();LinSysLhs_np.reset();LinSysRhs_np.reset();tmpmatrix_np.reset();MLmatrix_np.reset();Amatrix_np.reset();Ivector_np.reset();alphamatrix_np.reset();theta.reset();epsln.reset();l_dep.reset();
 	A0_Mg.reset();G0_Mg.reset();G1_Mg.reset();I0_Mg.reset();I1_Mg.reset();
 	A0_OH.reset();G0_OH.reset();G1_OH.reset();I0_OH.reset();I1_OH.reset();
 
@@ -534,8 +529,8 @@ int main(int argc,char ** args) {
 	PCDestroy(&Conditioner_np);
 
 	//shared file streams
-	StoringStream_p.reset();StoringStream_Mg.reset();StoringStream_OH.reset();StoringStream_pH.reset();StoringStream_theta.reset();StoringStream_epsln.reset();StoringStream_ldep.reset();
-std::cout<<"breakout "<<prcID<<std::endl;
+	StoringStream_p.reset();StoringStream_Mg.reset();StoringStream_OH.reset();StoringStream_pH.reset();StoringStream_theta.reset();StoringStream_epsln.reset();StoringStream_l_dep.reset();
+
 	PetscFinalize();
 
 	return 0;

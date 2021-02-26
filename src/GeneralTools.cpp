@@ -2,7 +2,7 @@
 
 using namespace dolfin;
 
-int funcRemoveNeg(dolfin::Function &func) {
+int funcNFilterZero(dolfin::Function &func) {
 	Vec vtmp;
 	VecDuplicate(as_type<const dolfin::PETScVector>(func.vector())->vec(), &vtmp);
 	VecSet(vtmp, 0);
@@ -56,12 +56,12 @@ int SharedTypeVectorDestructor(std::vector<std::shared_ptr<myType>> &vshrtype) {
 	return 0;
 }
 
-int FunctionFilterAvg(Vec func, dolfin::FunctionSpace Vh, dolfin::Mesh mesh) {
+int FunctionNFilterMin(Vec func, dolfin::FunctionSpace Vh, dolfin::Mesh mesh) {
 	const PetscScalar* f_i;
 	const unsigned int *nb;
 	std::vector<std::size_t> NeighbourhoodVertices;
-	double avg;
-	PetscInt VecLocalsize, ConnectedEdgesize, n;
+	double minval;
+	PetscInt VecLocalsize, ConnectedEdgesize;
 
 	VecGetLocalSize(func, &VecLocalsize);
 	VecGetArrayRead(func, &f_i);
@@ -72,27 +72,23 @@ int FunctionFilterAvg(Vec func, dolfin::FunctionSpace Vh, dolfin::Mesh mesh) {
 	//filter out negative values by average of their positive neighbours
 	for (std::size_t i=0; i<VecLocalsize; i=i+1) {
 		if (f_i[i]<0) {
-			avg=0;
-			n=0;
+			minval=0;
 			nb = Vertex(mesh, dof2v[i]).entities(1);
 			ConnectedEdgesize = Vertex(mesh, dof2v[i]).num_entities(1);
 			for (std::size_t j=0; j<ConnectedEdgesize; j=j+1) {
 				if ((Edge(mesh, dof2v[j]).entities(0))[0]!=dof2v[i]) {
 					NeighbourhoodVertices.push_back(v2dof[(Edge(mesh, dof2v[j]).entities(0))[0]]);
 				}
-				else {
+				if ((Edge(mesh, dof2v[j]).entities(0))[1]!=dof2v[i]) {
 					NeighbourhoodVertices.push_back(v2dof[(Edge(mesh, dof2v[j]).entities(0))[1]]);
 				}
 			}
 			for (std::size_t k=0; k<NeighbourhoodVertices.size(); k=k+1) {
 				if (f_i[NeighbourhoodVertices[k]]>=0) {
-					avg = avg + f_i[NeighbourhoodVertices[k]];
-					n = n+1;
+					minval = std::min(minval, f_i[NeighbourhoodVertices[k]]);
 				}
 			}
-			if (n>0) {
-				VecSetValueLocal(func, i, avg/n, INSERT_VALUES);
-			}
+			VecSetValueLocal(func, i, minval, INSERT_VALUES);
 		}
 	}
 	VecAssemblyBegin(func);
