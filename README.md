@@ -9,4 +9,7 @@ You can find related details of all tools and packages. Indeed some of them supp
 
 - **Operation System:** Ubuntu 20.04.2 LTS
 
-  To assure
+  To assure all compilers are updated on essential packages are installd, in shell the following command can be run:
+  '''shell
+  sudo apt-get install build-essential software-properties-common
+  '''
