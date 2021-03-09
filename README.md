@@ -28,3 +28,4 @@ You can find related details of all tools and packages. Indeed some of them supp
     ```
     2. MPICH havs similar steps for installation
 - **PETSc:** FEniCS has a default version of PETSc libraries in case PETSc is not installed on the system or the environmental variables are not correctly set. Therefore step one is to install PETSc and step two is to set environmental variables. Since as a parallel computing library PETSc is optimized and updated continuously, installing the last version instead of relying on FEnics internal PETSc library is strongly recommended.
+    1. To install PETSc
