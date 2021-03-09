@@ -8,5 +8,4 @@ To keep it short usually a link to full description of installation or issue is 
 You can find related details of all tools and packages. Indeed some of them supplied together and there is no need for installation but naming all is for having the big image of setups resulted to the respective publication. In case of installation keeping the order is recommended to avoid possible errors.
 
 - **Operation System:** Ubuntu 20.04.2 LTS
-
-To assure
+  To assure
