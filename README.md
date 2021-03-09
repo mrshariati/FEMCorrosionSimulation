@@ -26,4 +26,5 @@ You can find related details of all tools and packages. Indeed some of them supp
     ```shell
     sudo apt install openmpi-bin=<specific version>(example: =4.0.3-0ubuntu1)
     ```
-    2. MPICH
+    2. MPICH should have similar steps for installation
+- **PETSc:** 
