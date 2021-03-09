@@ -14,5 +14,14 @@ You can find related details of all tools and packages. Indeed some of them supp
   sudo apt-get install build-essential software-properties-common
   ```
 - **MPI:** The basic Message Passing Interface (MPI) can be applied through two most common implementations:
-  1.OPEN MPI which is the one we used. It is required to build PETSc. Although PETSc would install it itself if it is not existed in the system, this way by passing the version it is possible to use the most recent one. 
+  1.OPEN MPI which is the one we used. It is required to build PETSc. Although PETSc would install it itself if it is not existed in the system, this way by passing the version it is possible to use the latest version. In ubuntu 20.04.2 LTS the following command installs `Open MPI 4.0.3`.
+  ```shell
+  sudo apt install openmpi-bin
+  ```
+  For other linux systems one option here is to enlist all available versions:
+  ```shell
+  apt list -a openmpi-bin
+  ```
+  Then install an specific version:
+  sudo apt install openmpi-bin=<specific version>(example: =4.0.3-0ubuntu1)
   2.MPICH
