@@ -52,8 +52,7 @@ You can find related details of all tools and packages. Indeed some of them supp
     export PETSC_DIR PETSC_ARCH
     ```
 ```mermaid
-%% Example of sequence diagram
-  sequenceDiagram
+    sequenceDiagram
     Alice->>Bob: Hello Bob, how are you?
     alt is sick
     Bob->>Alice: Not so good :(
@@ -63,4 +62,4 @@ You can find related details of all tools and packages. Indeed some of them supp
     opt Extra response
     Bob->>Alice: Thanks for asking
     end
-​```
+```
