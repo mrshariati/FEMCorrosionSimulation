@@ -51,15 +51,9 @@ You can find related details of all tools and packages. Indeed some of them supp
     PETSC_ARCH=PETScForFEniCS 
     export PETSC_DIR PETSC_ARCH
     ```
-```mermaid
-    sequenceDiagram
-    Alice->>Bob: Hello Bob, how are you?
-    alt is sick
-    Bob->>Alice: Not so good :(
-    else is well
-    Bob->>Alice: Feeling fresh like a daisy
-    end
-    opt Extra response
-    Bob->>Alice: Thanks for asking
-    end
-```
+    flowchart
+graph LR
+    A[Hard edge] -->|Link text| B(Round edge)
+    B --> C{Decision}
+    C -->|One| D[Result one]
+    C -->|Two| E[Result two]
