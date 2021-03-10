@@ -27,5 +27,10 @@ You can find related details of all tools and packages. Indeed some of them supp
     sudo apt install openmpi-bin=<specific version>(example: =4.0.3-0ubuntu1)
     ```
     2. MPICH havs similar steps for installation
-- **PETSc:** FEniCS has a default version of PETSc libraries in case PETSc is not installed on the system or the environmental variables are not correctly set. Therefore step one is to install PETSc and step two is to set environmental variables. Since as a parallel computing library PETSc is optimized and updated continuously, installing the last version instead of relying on FEnics internal PETSc library is strongly recommended.
-    1. To install PETSc
+- **PETSc:** In case PETSc is not installed on the system or the environmental variables are not correctly set, FEniCS has a default version of PETSc libraries. Since as a parallel computing library PETSc is optimized and updated continuously, installing the last version instead of relying on FEnics internal PETSc library is strongly recommended. Therefore step one is to install PETSc and step two is to set environmental variables.
+    1. To install PETSc the full explanation can be found [here](https://www.mcs.anl.gov/petsc/documentation/installation.html). In short, three requirements are MPI, BLAS and LAPACK. Similar to MPI the other two can be installed if desired by passing the version. Ubuntu 20.04.2 LTS installs `BLAS 3.9.0` and `LAPACK 3.9.0`.
+    ```shell
+    sudo apt install libblas-dev
+    sudo apt install liblapack-dev
+    ```
+    2. By setting two enviromental variales 
