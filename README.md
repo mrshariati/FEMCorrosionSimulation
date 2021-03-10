@@ -41,7 +41,7 @@ You can find related details of all tools and packages. Indeed some of them supp
     --with-parmetis-lib=/usr/local/lib/libparmetis.so --download-mumps=yes --download-scalapack=yes --download-suitesparse=yes
     ```
     (in case of installation on previous build pass also `--with-clean=1`)
-    2. By setting two enviromental variales `PETSC_DIR` and `PETSC_ARCH` permanently in respective [Linux system](https://unix.stackexchange.com/questions/117467/how-to-permanently-set-environmental-variables). The short code for Ubuntu 20.04.2 LTS is:
+    2. By setting two enviromental variales `PETSC_DIR` and `PETSC_ARCH` permanently in respective [Linux system](https://unix.stackexchange.com/questions/117467/how-to-permanently-set-environmental-variables). The short setting for Ubuntu 20.04.2 LTS is:
     ```shell
     sudo gedit /etc/profile
     ```
