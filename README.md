@@ -35,8 +35,9 @@ You can find related details of all tools and packages. Indeed some of them supp
     ```
     Some optional flags can pass to PETSc while configuring to enhance the performance, among them `ParMETIS 4.0.3` and `METIS 5.1.0` should be installed manually from [ParMETIS](http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download) and [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download). Other libraries can be downloaded through PETSc, then the configuring line of PETSc looks like the following:
     ```shell
-    ./configure --with-packages-build-dir=/where/the/extracted/folder/is/petsc-3.13.0/myTemporaryBuild --PETSC_ARCH=PETScForFEniCS --download-hypre=yes 
-    --with-metis-include=/usr/local/include/ --with-metis-lib=/usr/local/lib/libmetis.so --with-parmetis-include=/usr/local/include/ 
+    ./configure --with-packages-build-dir=/where/the/extracted/folder/is/petsc-3.13.0/myTemporaryBuild 
+    --PETSC_ARCH=PETScForFEniCS --download-hypre=yes --with-metis-include=/usr/local/include/ 
+    --with-metis-lib=/usr/local/lib/libmetis.so --with-parmetis-include=/usr/local/include/ 
     --with-parmetis-lib=/usr/local/lib/libparmetis.so --download-mumps=yes --download-scalapack=yes --download-suitesparse=yes
     ```
     (in case of installation on previous build pass also `--with-clean=1`)
@@ -44,7 +45,7 @@ You can find related details of all tools and packages. Indeed some of them supp
     ```shell
     sudo gedit /etc/profile
     ```
-    Add the following lines to the end of file and rebbot:
+    Add the following lines to the end of file and reboot:
     ```shell
     PETSC_DIR=/where/it/is/installed/petsc-3.13.0 
     PETSC_ARCH=PETScForFEniCS 
