@@ -62,4 +62,9 @@ You can find related details of all tools and packages. Indeed some of them supp
   cmake ..
   make install
   ```
-- **SUNDIALS:** It is a package for solving differential/algebraic equations. CVODE module for system of ordinary differential equations is integrated here. The download and installation guide can be found in [SUNDIALS](https://computing.llnl.gov/projects/sundials/sundials-software).
+- **SUNDIALS:** It is a package for solving differential/algebraic equations. CVODE module for system of ordinary differential equations is integrated here. The download and installation guide can be found in [SUNDIALS](https://computing.llnl.gov/projects/sundials/sundials-software). After extracting into a folder (e.g. SourceDIR) and creating a folder (e.g. BuildDIR) in parallel to that. The following commands from inside the BuildDIR will install CVODE in default directory.
+  ```shell
+  cmake ../cvode-5.7.0
+  make
+  make install
+  ```
