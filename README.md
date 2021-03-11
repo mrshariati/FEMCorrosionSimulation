@@ -29,11 +29,11 @@ You can find related details of all tools and packages. Indeed some of them supp
     2. MPICH havs similar steps for installation
 - **PETSc:** In case PETSc is not installed on the system or the environmental variables are not correctly set, FEniCS has a default version of PETSc libraries. Since as a parallel computing library PETSc is optimized and updated continuously, installing the last version instead of relying on FEnics internal PETSc library is strongly recommended. Therefore step one is to install PETSc and step two is to set environmental variables.
     1. To install PETSc the full explanation can be found in [PETSc](https://www.mcs.anl.gov/petsc/documentation/installation.html). In short, three requirements are MPI, BLAS and LAPACK. Similar to MPI the other two can be installed if desired by passing the version. Ubuntu 20.04.2 LTS installs `BLAS 3.9.0` and `LAPACK 3.9.0`.
-    ```shell
-    sudo apt install libblas-dev
-    sudo apt install liblapack-dev
-    ```
-      Some optional flags can be passed to PETSc while configuring to enhance the performance, among them `ParMETIS 4.0.3` and `METIS 5.1.0` should be installed manually from [ParMETIS](http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download) and [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download). Other libraries can be downloaded through PETSc, then the configuring line of PETSc looks like the following:
+      ```shell
+      sudo apt install libblas-dev
+      sudo apt install liblapack-dev
+      ```
+ Some optional flags can be passed to PETSc while configuring to enhance the performance, among them `ParMETIS 4.0.3` and `METIS 5.1.0` should be installed manually from [ParMETIS](http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download) and [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download). Other libraries can be downloaded through PETSc, then the configuring line of PETSc looks like the following:
     ```shell
     ./configure --with-packages-build-dir=/where/the/extracted/folder/is/petsc-3.13.0/myTemporaryBuild 
     --PETSC_ARCH=PETScForFEniCS --download-hypre=yes --with-metis-include=/usr/local/include/ 
