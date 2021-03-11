@@ -83,4 +83,5 @@ cmake .
 make
 mpirun -np 1 demo_corrosion
 ```
-
+Major changes and extensions to tailor this code to a problem are discussed at the following levels/tools:
+- **Gmsh:** It can be downloaded from [Gmsh](https://gmsh.info/). Applying this any complex geometry can be triangulated and transformed into suitable mesh for finite elements method.
