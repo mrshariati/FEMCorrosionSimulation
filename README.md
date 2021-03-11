@@ -33,7 +33,7 @@ You can find related details of all tools and packages. Indeed some of them supp
     sudo apt install libblas-dev
     sudo apt install liblapack-dev
     ```
-    Some optional flags can pass to PETSc while configuring to enhance the performance, among them `ParMETIS 4.0.3` and `METIS 5.1.0` should be installed manually from [ParMETIS](http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download) and [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download). Other libraries can be downloaded through PETSc, then the configuring line of PETSc looks like the following:
+    Some optional flags can be passed to PETSc while configuring to enhance the performance, among them `ParMETIS 4.0.3` and `METIS 5.1.0` should be installed manually from [ParMETIS](http://glaros.dtc.umn.edu/gkhome/metis/parmetis/download) and [METIS](http://glaros.dtc.umn.edu/gkhome/metis/metis/download). Other libraries can be downloaded through PETSc, then the configuring line of PETSc looks like the following:
     ```shell
     ./configure --with-packages-build-dir=/where/the/extracted/folder/is/petsc-3.13.0/myTemporaryBuild 
     --PETSC_ARCH=PETScForFEniCS --download-hypre=yes --with-metis-include=/usr/local/include/ 
