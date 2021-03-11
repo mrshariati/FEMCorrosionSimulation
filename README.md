@@ -62,6 +62,14 @@ You can find related details of all tools and packages. Indeed some of them supp
   cmake ..
   make install
   ```
+  It is necessary to set dolfin library directory permanently. To do this the steps are as follows:
+  ```shell
+  sudo gedit /etc/profile
+  ```
+  and then adding the following lines to the end of file and reboot:
+  ```shell
+  source /usr/local/share/dolfin/dolfin.conf
+  ```
 - **SUNDIALS:** It is a package for solving differential/algebraic equations. CVODE module for system of ordinary differential equations is integrated here. The download and installation guide can be found in [SUNDIALS](https://computing.llnl.gov/projects/sundials/sundials-software). After extracting into a folder (e.g. SourceDIR) and creating a folder (e.g. BuildDIR) in parallel to that. The following commands from inside the BuildDIR will install CVODE in default directory.
   ```shell
   cmake ../cvode-5.7.0
