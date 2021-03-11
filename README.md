@@ -62,3 +62,4 @@ You can find related details of all tools and packages. Indeed some of them supp
   cmake ..
   make install
   ```
+- **SUNDIALS:** It is a package for solving differential/algebraic equations. CVODE module for system of ordinary differential equations is integrated here. The download and installation guide can be found in [SUNDIALS](https://computing.llnl.gov/projects/sundials/sundials-software).
