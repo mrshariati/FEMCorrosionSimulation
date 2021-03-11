@@ -84,4 +84,4 @@ make
 mpirun -np 1 demo_corrosion
 ```
 Major changes and extensions to tailor this code to a problem are discussed at the following levels/tools:
-- **Gmsh:** It can be downloaded from [Gmsh](https://gmsh.info/). Applying this any complex geometry can be triangulated and transformed into suitable mesh for finite elements method.
+- **Gmsh:** It can be downloaded from [Gmsh](https://gmsh.info/). Applying this any complex geometry can be triangulated and transformed into suitable mesh for finite elements method. A mesh and different marked borders can be saved into several .msh file. Note to choose ASCII 2 option while saving to avoid issues in the next steps.
