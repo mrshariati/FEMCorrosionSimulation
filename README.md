@@ -41,19 +41,13 @@ You can find related details of all tools and packages. Indeed some of them supp
     --with-parmetis-lib=/usr/local/lib/libparmetis.so --download-mumps=yes --download-scalapack=yes --download-suitesparse=yes
     ```
     (in case of installation on previous build pass also `--with-clean=1`)
-    2. By setting two enviromental variales `PETSC_DIR` and `PETSC_ARCH` permanently in respective [Linux system](https://unix.stackexchange.com/questions/117467/how-to-permanently-set-environmental-variables). The short setting for Ubuntu 20.04.2 LTS is:
+    2. By setting two enviromental variales `PETSC_DIR` and `PETSC_ARCH` permanently in respective [Linux system](https://unix.stackexchange.com/questions/117467/how-to-permanently-set-environmental-variables). The short setting for Ubuntu 20.04.2 LTS is first:
     ```shell
     sudo gedit /etc/profile
     ```
-    Add the following lines to the end of file and reboot:
+    and then adding the following lines to the end of file and reboot:
     ```shell
     PETSC_DIR=/where/it/is/installed/petsc-3.13.0 
     PETSC_ARCH=PETScForFEniCS 
     export PETSC_DIR PETSC_ARCH
     ```
-    flowchart
-graph LR
-    A[Hard edge] -->|Link text| B(Round edge)
-    B --> C{Decision}
-    C -->|One| D[Result one]
-    C -->|Two| E[Result two]
