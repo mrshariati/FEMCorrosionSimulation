@@ -15,17 +15,17 @@ You can find related details of all tools and packages. Indeed some of them supp
   ```
 - **MPI:** The basic Message Passing Interface (MPI) can be applied through two most common implementations:
     1. OPEN MPI which is the one we used. It is required to build PETSc. Although PETSc would install it itself if it is not installed on the system, installing from shell in ubuntu 20.04.2 LTS by the following command installs `Open MPI 4.0.3`. Installation from source is not recommended.
-    ```shell
-    sudo apt install openmpi-bin
-    ```
-    For other linux systems one option here is to enlist all available versions:
-    ```shell
-    apt list -a openmpi-bin
-    ```
-    Then install an specific version:
-    ```shell
-    sudo apt install openmpi-bin=<specific version>(example: =4.0.3-0ubuntu1)
-    ```
+      ```shell
+      sudo apt install openmpi-bin
+      ```
+      For other linux systems one option here is to enlist all available versions:
+      ```shell
+      apt list -a openmpi-bin
+      ```
+      Then install an specific version:
+      ```shell
+      sudo apt install openmpi-bin=<specific version>(example: =4.0.3-0ubuntu1)
+      ```
     2. MPICH havs similar steps for installation
 - **PETSc:** In case PETSc is not installed on the system or the environmental variables are not correctly set, FEniCS has a default version of PETSc libraries. Since as a parallel computing library PETSc is optimized and updated continuously, installing the last version instead of relying on FEnics internal PETSc library is strongly recommended. Therefore step one is to install PETSc and step two is to set environmental variables.
     1. To install PETSc the full explanation can be found in [PETSc](https://www.mcs.anl.gov/petsc/documentation/installation.html). In short, three requirements are MPI, BLAS and LAPACK. Similar to MPI the other two can be installed if desired by passing the version. Ubuntu 20.04.2 LTS installs `BLAS 3.9.0` and `LAPACK 3.9.0`.
