@@ -51,3 +51,7 @@ You can find related details of all tools and packages. Indeed some of them supp
         PETSC_ARCH=PETScForFEniCS 
         export PETSC_DIR PETSC_ARCH
         ```
+- **FEniCS:** There are different ways for installation discussed in [FEniCS](https://fenics.readthedocs.io/en/latest/installation.html#id6). Since any part of code is not in python, the fastest way is to only install `fenics-ffc` component. FFC requires `fenics-fiat`, `fenics-ufl` and `fenics-dijitso` that should be installed automatically, however if not they can be installed similarly.
+  ```shell
+  pip3 install fenics-ffc --upgrade
+  ```
