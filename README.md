@@ -55,3 +55,10 @@ You can find related details of all tools and packages. Indeed some of them supp
   ```shell
   pip3 install fenics-ffc --upgrade
   ```
+The installation is complete by installing Dolfin module. The download and installation manual can be found in [Dolfin](https://bitbucket.org/fenics-project/dolfin/src/master/). For completeness, the following commands should be run in extracted folder after downloading the desired version.
+  ```shell
+  mkdir build
+  cd build
+  cmake ..
+  make install
+  ```
