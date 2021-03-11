@@ -76,4 +76,11 @@ You can find related details of all tools and packages. Indeed some of them supp
   make
   make install
   ```
-##Implementation
+## Implementation
+By successful installation of requirements the current simulation can be run by commands:
+```shell
+cmake .
+make
+mpirun -np 1 demo_corrosion
+```
+
