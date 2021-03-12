@@ -109,4 +109,4 @@ Major changes and extensions to tailor this code to a problem are discussed at t
 For Licences of all libraries and tools please read their respective homepages. This directory with original developed codes are available for application, modification and redistribution by citing as:
 - **Citation:**
 
-  Shariati, Mohamadreza, et al. “Enabling Intelligent Mg-Sheet Processing Utilizing Efficient Machine-Learning Algorithm.” Materials Science and Engineering A-Structural Materials Properties Microstructure and Processing, vol. 794, 2020, p. 139846.
+  Shariati, Mohamadreza, et al. Parallel simulation of the POISSON-NERNST-PLANCKcorrosion model with an algebraic flux cor-rection scheme. Advances in Engineering Software, 2021.
