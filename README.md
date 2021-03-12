@@ -105,3 +105,6 @@ Major changes and extensions to tailor this code to a problem are discussed at t
 - **SUNDIALS:** Embedded in `/src/CorrosionTools.cpp` minor changes on the system `y'=f(y,t)` and Jacobian of `f(y,t)` can cover a wide range of problems.
 - **ParaView:** The results are stored via Dolfin as (.pvd) files. The version `ParaView-4.4.0-Qt4-OpenGL2` can be downloaded from [ParaView](https://www.paraview.org/download/) is compatible for visualization.
 - **CMake:** The use of widely applied CMake for installation of Dolfin, PETSc and SUNDIALS provides efficient tool for binding such open-source libraries in the project. It can be downloaded and installed from [CMake](https://cmake.org/). The file `CMakeLists.txt` in this directory is an early example of how to bind different libraries and tools into a single project.
+## Licencing
+For Licences of all libraries and tools please read their respective homepages. This directory with original developed codes are available for application, modification and redistribution by citing as:
+- **Citation:**
