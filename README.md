@@ -93,7 +93,7 @@ Major changes and extensions to tailor this code to a problem are discussed at t
   ```shell
   meshio-convert mesh.msh mesh.xml -z
   ```
-  passing ~-z~ flag is critical to eliminate third dimension that creates ambiguity for FEniCS. More information on flags is available by:
+  passing `-z` flag is critical to eliminate third dimension that creates ambiguity for FEniCS. More information on flags is available by:
   ```shell
   meshio-convert -h
   ```
