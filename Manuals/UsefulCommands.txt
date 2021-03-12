@@ -1,2 +1,0 @@
-mpirun -n 6 --bind-to core --map-by socket ./stream
-
