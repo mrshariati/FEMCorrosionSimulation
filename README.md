@@ -103,3 +103,4 @@ Major changes and extensions to tailor this code to a problem are discussed at t
   ffc -l dolfin Poisson.ufl
   ```
 - **SUNDIALS:** Embedded in `/src/CorrosionTools.cpp` minor changes on the system `y'=f(y,t)` and Jacobian of `f(y,t)` can cover a wide range of problems.
+- **ParaView:** The results are stored via Dolfin as (.pvd) files. The version `ParaView-4.4.0-Qt4-OpenGL2` can be downloaded from [ParaView](https://www.paraview.org/download/) is compatible for visualization.
