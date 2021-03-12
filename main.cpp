@@ -161,12 +161,14 @@ int main(int argc,char ** args) {
 	l_dep->zero();
 	l_dep->operator=(0);//l0_dep
 
+	std::vector<double> StoredTimeSequence;
+	std::vector<double> StoredTimeStepSequence;
 	double theta0 = 0.1, eps0 = 0.55, l_dep0 = 1e-7, l_max = 1e-3, i_eq = 0.5127, phi_eq = -1.463, phi_Al = -1.163, phi_Mg = -1.763;//fixed model constants
 	double sqrt_theta_bar;
 	double t = 0;
 	double dt = 1e-2;
 	double dt_Adaptive = dt;
-	double scount = 60, hcount = 3600;
+	double scount = 60, hcount = 4*3600;
 	std::size_t SimulationTime = 12*3600;//unit is seconds
 
 	PetscBarrier(NULL);
@@ -427,13 +429,15 @@ int main(int argc,char ** args) {
 			StoringStream_theta->operator<<(*std::make_shared<dolfin::Function>(Vh, theta));
 			StoringStream_epsln->operator<<(*std::make_shared<dolfin::Function>(Vh, epsln));
 			StoringStream_l_dep->operator<<(*std::make_shared<dolfin::Function>(Vh, l_dep));
-			if (t<=11+dt) {
+			if (t<=3*3600+dt) {
 				scount = scount + 600;
 			}
 			else{
 				scount = hcount;
 				hcount = hcount + 3600;
 			}
+			StoredTimeSequence.push_back(t);
+			StoredTimeStepSequence.push_back(dt);
 		}
 
 		//updating
@@ -490,6 +494,16 @@ int main(int argc,char ** args) {
 	}
 
 	if(prcID==0) {
+		std::cout<<std::endl<<"Stored at t={0, ";
+		for (std::size_t i=0; i<(StoredTimeSequence.size()-1); i=i+1) {
+			std::cout<<StoredTimeSequence[i]<<", ";
+		}
+		std::cout<<StoredTimeSequence[StoredTimeSequence.size()-1]<<"}"<<std::endl;
+		std::cout<<std::endl<<"Time Steps at above t dt={1e-2, ";
+		for (std::size_t i=0; i<(StoredTimeStepSequence.size()-1); i=i+1) {
+			std::cout<<StoredTimeStepSequence[i]<<", ";
+		}
+		std::cout<<StoredTimeStepSequence[StoredTimeStepSequence.size()-1]<<"}"<<std::endl;
 		time(&end);
 		std::cout<<"total exc time: "<<double(end-start)<<std::endl;
 	}
