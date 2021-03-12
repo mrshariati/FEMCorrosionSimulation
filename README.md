@@ -97,4 +97,4 @@ Major changes and extensions to tailor this code to a problem are discussed at t
   ```shell
   meshio-convert -h
   ```
-  
+  - **FEniCS:** In this version only `mesh.xml` is imported and since mesh is a rectangle boundaries are defined as straight lines. A good starting point on how to import boundaries as (.xml) file is explained in [1](https://fenicsproject.org/qa/2986/how-to-define-boundary-condition-for-mesh-generated-by-gmsh/) and [2](https://fenicsproject.org/qa/5337/importing-marked-mesh-for-parallel-use/) as well marking with Gmsh in [3](https://github.com/nschloe/meshio/issues/265).
