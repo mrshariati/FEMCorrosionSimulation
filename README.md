@@ -1,5 +1,5 @@
 # FEMCorrosionSimulation
-The Finite Element method and utilities to simulate the corrosion process in parallel.
+Provides both source code for the Finite Element method and prerequisites to efficiently simulate the corrosion process using parallelization.
 
 To execute this code you need to install different packages and then make the execution file with CMake. Find in the following an overview of list of requirements.
 To keep it short usually a link to full description of installation or issue is attached.
