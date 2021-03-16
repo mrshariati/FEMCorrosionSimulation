@@ -1,11 +1,11 @@
 # FEMCorrosionSimulation
 Provides both source code for the Finite Element method and prerequisites to efficiently simulate the corrosion process using parallelization.
 
-To execute this code you need to install different packages and then make the execution file with CMake. Find in the following an overview of list of requirements.
-To keep it short usually a link to full description of installation or issue is attached.
+In order to compile and run this code you need to install different packages and then make the execution file with CMake. In the following an overview of list of prerequisites is given.
+To keep it short usually a link to full description of installation or issue is provided.
 
 ## Instalation
-You can find related details of all tools and packages. Indeed some of them supplied together and there is no need for installation but naming all is for having the big image of setups resulted to the respective publication. In case of installation keeping the order is recommended to avoid possible errors.
+In the following details of all tools and packages are given. Indeed some of them are supplied together and thus there is no need for separate installation. However naming all is for having the big image of setups related to the underlying publication, see the licensing section at the end of this documentation. In case of installations, keeping the order is recommended to avoid possible errors.
 
 - **Operation System:** Ubuntu 20.04.2 LTS
 
@@ -105,8 +105,8 @@ Major changes and extensions to tailor this code to a problem are discussed at t
 - **SUNDIALS:** Embedded in `/src/CorrosionTools.cpp` minor changes on the system `y'=f(y,t)` and Jacobian of `f(y,t)` can cover a wide range of problems.
 - **ParaView:** The results are stored via Dolfin as (.pvd) files. The version `ParaView-4.4.0-Qt4-OpenGL2` can be downloaded from [ParaView](https://www.paraview.org/download/) is compatible for visualization.
 - **CMake:** The use of widely applied CMake for installation of Dolfin, PETSc and SUNDIALS provides efficient tool for binding such open-source libraries in the project. It can be downloaded and installed from [CMake](https://cmake.org/). The file `CMakeLists.txt` in this directory is an early example of how to bind different libraries and tools into a single project.
-## Licencing
-For Licences of all libraries and tools please read their respective homepages. This directory with original developed codes are available for application, modification and redistribution by citing as:
+## Licensing
+For Licenses of all libraries and tools please read their respective homepages. This directory with original developed codes are available for application, modification and redistribution by citing as:
 - **Citation:**
 
   Shariati, Mohamadreza, et al. Parallel simulation of the POISSON-NERNST-PLANCK corrosion model with an algebraic flux cor-rection scheme. Advances in Engineering Software, 2021.
