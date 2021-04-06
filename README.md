@@ -106,4 +106,5 @@ Major changes and extensions to tailor this code to a specific problem are discu
 For Licenses of all libraries and tools please read their respective homepages. This directory with original developed codes is available for application, modification, and redistribution by citing as:
 - **Citation:**
 
-  Shariati, Mohamadreza, et al. Parallel simulation of the POISSON-NERNST-PLANCK corrosion model with an algebraic flux correction scheme. Advances in Engineering Software, 2021.
+  This code is supplied with the submitted paper:
+  Shariati, M., Weber, E.W., Höche, D., 2021. Parallel simulation of the POISSON-NERNST-PLANCK corrosion model with an algebraic flux correction scheme.
