@@ -163,13 +163,13 @@ int main(int argc,char ** args) {
 
 	std::vector<double> StoredTimeSequence;
 	std::vector<double> StoredTimeStepSequence;
-	double theta0 = 0.1, eps0 = 0.55, l_dep0 = 1e-7, l_max = 1e-3, i_eq = 0.5127, phi_eq = -1.463, phi_Al = -1.163, phi_Mg = -1.763;//fixed model constants
+	double theta0 = 0.1, eps0 = 0.55, l_dep0 = 1e-8, l_max = 1e-3, i_eq = 0.5127, phi_eq = -1.463, phi_Al = -1.163, phi_Mg = -1.763;//fixed model constants
 	double sqrt_theta_bar;
 	double t = 0;
 	double dt = 1e-2;
 	double dt_Adaptive = dt;
 	double scount = 60, hcount = 4*3600;
-	std::size_t SimulationTime = 12*3600;//unit is seconds
+	std::size_t SimulationTime = 24*3600;//unit is seconds
 
 	PetscBarrier(NULL);
 
@@ -236,8 +236,6 @@ int main(int argc,char ** args) {
 	I0_OH->zero();
 	auto I1_OH = std::make_shared<dolfin::PETScVector>(*(as_type<const dolfin::PETScVector>(OHfuncs[0]->vector())));
 	I1_OH->zero();
-
-	VecScale(Ivector_np->vec(), 2);//Mg->2OH
 
 	PetscBarrier(NULL);
 
@@ -382,10 +380,6 @@ int main(int argc,char ** args) {
 		MatCopy(Amatrix_np->mat(), A0_Mg->mat(), DIFFERENT_NONZERO_PATTERN);
 
 		//OH
-		VecScale(Ivector_np->vec(), 2);//Mg->2OH
-
-		PetscBarrier(NULL);
-
 		iOH(DOFsSetOnAlElectrode, Phibar->vec(), l_Al, l_Mg, sqrt_theta_bar, i_eq, phi_eq, phi_Al, t, Ivector_np->vec());
 
 		WeakAssign(*A_np, {"Di", "zi"}, OHconsts);// electric field has already assigned

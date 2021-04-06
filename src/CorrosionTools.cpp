@@ -149,12 +149,12 @@ int iMg(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, Vec cMg, Vec cOH , Vec 
 		if ((1e-15<t)&&(t<=3*3600)) {
 			//extracting dirichlet condition for electric field
 			//phi_Mg computation
-			phi_Mg = ((phi_eq-0.0001-phi0_Mg)/(std::log(3*3600/1e-15))) * std::log(t/1e-15) + phi0_Mg;
+			phi_Mg = ((phi_eq-0.001-phi0_Mg)/(std::log(3*3600/1e-15))) * std::log(t/1e-15) + phi0_Mg;
 		}
-		else if ((3*3600<t)&&(t<=9*3600)){
+		else if ((3*3600<t)&&(t<=24*3600)){
 			//extracting dirichlet condition for electric field
 			//phi_Mg computation
-			phi_Mg = (0.0001/(std::log(9*3600/(3*3600)))) * std::log(t/(3*3600)) + phi_eq-0.0001;
+			phi_Mg = (0.001/(std::log(24*3600/(3*3600)))) * std::log(t/(3*3600)) + phi_eq-0.001;
 		}
 		else {
 			phi_Mg = phi_eq;
@@ -221,6 +221,8 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, double l_Al, double l_M
 	//Input: Dofset on boundary, Phibar, l_Al, iAl, phi_eq, phi0_Al, t
 	//Output: Ii
 
+	VecSet(Ii, 0);
+
 	PetscScalar i_Al;
 	PetscScalar phi_Al;
 
@@ -228,12 +230,12 @@ int iOH(std::vector<size_t> LocalDOFSet_bar, Vec Phibar, double l_Al, double l_M
 	if ((1e-15<t)&&(t<=3*3600)) {
 		//extracting dirichlet condition for electric field
 		//phi_Mg computation
-		phi_Al = ((phi_eq+0.0001-phi0_Al)/(std::log(3*3600/1e-15))) * std::log(t/1e-15) + phi0_Al;
+		phi_Al = ((phi_eq+0.001-phi0_Al)/(std::log(3*3600/1e-15))) * std::log(t/1e-15) + phi0_Al;
 	}
-	else if ((3*3600<t)&&(t<=9*3600)){
+	else if ((3*3600<t)&&(t<=24*3600)){
 		//extracting dirichlet condition for electric field
 		//phi_Mg computation
-		phi_Al = (-0.0001/(std::log(9*3600/(3*3600)))) * std::log(t/(3*3600)) + phi_eq+0.0001;
+		phi_Al = (-0.001/(std::log(24*3600/(3*3600)))) * std::log(t/(3*3600)) + phi_eq+0.001;
 	}
 	else {
 		phi_Al = phi_eq;
