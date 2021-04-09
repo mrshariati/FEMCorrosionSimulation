@@ -4,7 +4,7 @@ Provides both source code for the Finite Element method and prerequisites to eff
 In order to compile and run this code you need to install different packages and then make the execution file with CMake. In the following an overview of list of prerequisites is given.
 To keep it short usually a link to full description of installation or issue is provided.
 
-## Instalation
+## Installation
 In the following details of all tools and packages are given. Indeed some of them are supplied together and thus there is no need for separate installation. However naming all is for having the big image of setups related to the underlying publication, see the licensing section at the end of this documentation. In case of installations, keeping the order is recommended to avoid possible errors.
 
 - **Operating System:** Ubuntu 20.04.2 LTS
