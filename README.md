@@ -1,4 +1,4 @@
-# FEMCorrosionSimulation
+# FEMCorrosionSimulation - FEniC(orr)S
 Provides both source code for the Finite Element method and prerequisites to efficiently simulate the corrosion process using parallelization.
 
 In order to compile and run this code you need to install different packages and then make the execution file with CMake. In the following an overview of list of prerequisites is given.
