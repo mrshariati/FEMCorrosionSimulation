@@ -163,13 +163,13 @@ int main(int argc,char ** args) {
 
 	std::vector<double> StoredTimeSequence;
 	std::vector<double> StoredTimeStepSequence;
-	double theta0 = 0.1, eps0 = 0.55, l_dep0 = 1e-8, l_max = 1e-3, i_eq = 0.5127, phi_eq = -1.463, phi_Al = -1.163, phi_Mg = -1.763;//fixed model constants
+	double theta0 = 0.1, eps0 = 0.55, l_dep0 = 1e-7, l_max = 1e-3, i_eq = 0.5127, phi_eq = -1.463, phi_Al = -1.163, phi_Mg = -1.763;//fixed model constants
 	double sqrt_theta_bar;
 	double t = 0;
 	double dt = 1e-2;
 	double dt_Adaptive = dt;
 	double scount = 60, hcount = 4*3600;
-	std::size_t SimulationTime = 24*3600;//unit is seconds
+	std::size_t SimulationTime = 12*3600;//unit is seconds
 
 	PetscBarrier(NULL);
 
